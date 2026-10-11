@@ -12,7 +12,9 @@ import {
   HardHat,
   ChevronRight,
   Sparkles,
+  Share2,
 } from 'lucide-react';
+import { PWAInstallButton } from '../pwa/PWAInstallButton';
 
 export type NavigationTab =
   | 'dashboard'
@@ -30,6 +32,7 @@ interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   onLoadDemo: () => void;
+  onOpenShare?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -38,6 +41,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
   onLoadDemo,
+  onOpenShare,
 }) => {
   const menuItems: { id: NavigationTab; label: string; icon: React.ReactNode; badge?: string }[] = [
     {
@@ -109,8 +113,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Brand Header inside Mobile Drawer */}
         <div className="flex items-center justify-between px-4 sm:px-5 h-16 border-b border-[#1c3a63] lg:hidden">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#F28C28] flex items-center justify-center text-white">
-              <HardHat className="w-5 h-5" />
+            <div className="w-8 h-8 rounded-lg overflow-hidden bg-[#F28C28] flex items-center justify-center text-white border border-orange-400/30">
+              <img
+                src="/pwa-192x192.png"
+                alt="Logo SIM-TK204"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/icon.svg';
+                }}
+              />
             </div>
             <span className="font-bold text-lg text-white">SIM-TK204</span>
           </div>
@@ -206,6 +217,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             );
           })}
+        </div>
+
+        {/* PWA & Share Actions Card */}
+        <div className="px-3 pt-2 space-y-2">
+          <PWAInstallButton variant="sidebar" />
+
+          {onOpenShare && (
+            <button
+              onClick={() => {
+                onOpenShare();
+                if (window.innerWidth < 1024) onClose();
+              }}
+              className="w-full flex items-center justify-between px-3.5 py-2 rounded-lg text-xs font-semibold bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 border border-slate-700 transition-colors min-h-[40px]"
+            >
+              <div className="flex items-center gap-2.5">
+                <Share2 className="w-4 h-4 text-[#F28C28]" />
+                <span>Bagikan Link Aplikasi</span>
+              </div>
+              <span className="text-[10px] text-slate-400">Share</span>
+            </button>
+          )}
         </div>
 
         {/* Quick Demo Data Reset Card */}

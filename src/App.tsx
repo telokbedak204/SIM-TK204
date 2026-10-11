@@ -10,6 +10,8 @@ import { exportWeeklyMonitoringToPDF } from './lib/pdfExport';
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar, NavigationTab } from './components/layout/Sidebar';
 import { ToastContainer, ToastMessage } from './components/ui/Notification';
+import { ShareAppModal } from './components/pwa/ShareAppModal';
+import { OfflineIndicator } from './components/pwa/OfflineIndicator';
 
 // Pages
 import { DashboardPage } from './pages/DashboardPage';
@@ -36,8 +38,9 @@ export default function App() {
   const [endDateStr, setEndDateStr] = useState<string>('2026-10-08');
   const [selectedDailyDate, setSelectedDailyDate] = useState<string>('2026-10-02');
 
-  // Notifications
+  // Notifications & Modals
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
 
   const addToast = useCallback((type: 'success' | 'warning' | 'error' | 'info', message: string, title?: string) => {
     const id = `toast-${Date.now()}-${Math.random()}`;
@@ -243,6 +246,7 @@ export default function App() {
         currentUser={currentUser}
         onRoleChange={handleRoleChange}
         onOpenSettings={() => setCurrentTab('settings')}
+        onOpenShare={() => setIsShareModalOpen(true)}
       />
 
       {/* Main Container with Sidebar */}
@@ -254,6 +258,7 @@ export default function App() {
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
           onLoadDemo={handleResetDemo}
+          onOpenShare={() => setIsShareModalOpen(true)}
         />
 
         {/* Content Area */}
@@ -346,13 +351,25 @@ export default function App() {
               />
             )}
 
-            {currentTab === 'about' && <AboutPage />}
+            {currentTab === 'about' && (
+              <AboutPage onOpenShare={() => setIsShareModalOpen(true)} />
+            )}
           </div>
         </main>
       </div>
 
       {/* Floating Toast Notification Container */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
+      {/* Share App Link & Social Preview Modal */}
+      <ShareAppModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        onShowToast={(type, msg) => addToast(type, msg)}
+      />
+
+      {/* Offline Connectivity Status Toast */}
+      <OfflineIndicator />
     </div>
   );
 }

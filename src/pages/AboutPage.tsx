@@ -8,27 +8,141 @@ import {
   CheckCircle2,
   Server,
   Code2,
+  Smartphone,
+  Share2,
+  Wifi,
+  Zap,
 } from 'lucide-react';
+import { PWAInstallButton } from '../components/pwa/PWAInstallButton';
 
-export const AboutPage: React.FC = () => {
+interface AboutPageProps {
+  onOpenShare?: () => void;
+}
+
+export const AboutPage: React.FC<AboutPageProps> = ({ onOpenShare }) => {
   return (
     <div className="space-y-6 max-w-4xl mx-auto w-full min-w-0">
-      {/* Brand Hero */}
-      <div className="bg-[#142B4A] rounded-2xl p-4 sm:p-6 text-white shadow-md">
-        <div className="flex items-center gap-3 sm:gap-3.5 mb-3">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[#F28C28] flex items-center justify-center text-white shadow shrink-0">
-            <HardHat className="w-6 h-6 sm:w-7 sm:h-7" />
+      {/* Brand Hero with Official Logo */}
+      <div className="bg-[#142B4A] rounded-2xl p-5 sm:p-7 text-white shadow-md relative overflow-hidden border border-[#1d3d66]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5 sm:gap-4">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden bg-[#F28C28] flex items-center justify-center text-white shadow-xl border-2 border-orange-400/50 shrink-0">
+              <img
+                src="/pwa-192x192.png"
+                alt="Logo Resmi SIM-TK204"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/icon.svg';
+                }}
+              />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">SIM-TK204</h1>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-orange-500/20 text-[#F28C28] border border-orange-500/30">
+                  PWA Ready
+                </span>
+              </div>
+              <p className="text-[11px] sm:text-xs text-orange-200 font-semibold tracking-wider uppercase mt-0.5">
+                Sistem Informasi Monitoring Tenaga Kerja Proyek Konstruksi
+              </p>
+            </div>
+          </div>
+
+          {onOpenShare && (
+            <button
+              onClick={onOpenShare}
+              className="self-start sm:self-auto px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 active:scale-95 text-white text-xs font-bold shadow transition-all flex items-center gap-2 shrink-0 min-h-[40px]"
+            >
+              <Share2 className="w-4 h-4" />
+              <span>Bagikan Link Aplikasi</span>
+            </button>
+          )}
+        </div>
+
+        <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl mt-4">
+          Aplikasi administrasi dan monitoring tenaga kerja harian/mingguan yang dirancang khusus untuk kontraktor pelaksana, konsultan Manajemen Konstruksi (MK), dan direksi pekerjaan. Sistem ini memadukan pencatatan presisi lapangan, perhitungan kumulatif otomatis, visualisasi tren kehadiran, serta ekspor laporan administratif dalam format Excel (.xlsx) dan PDF resmi berstandar proyek.
+        </p>
+      </div>
+
+      {/* PWA Installation Card */}
+      <PWAInstallButton variant="banner" />
+
+      {/* Social Sharing Card & Meta Description Information */}
+      <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-[#142B4A] font-bold text-sm">
+            <Share2 className="w-5 h-5 text-[#F28C28]" />
+            <span>Deskripsi & Pratinjau Tautan Berbagi Resmi</span>
+          </div>
+          {onOpenShare && (
+            <button
+              onClick={onOpenShare}
+              className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1"
+            >
+              <span>Buka Dialog Berbagi</span>
+              <span>→</span>
+            </button>
+          )}
+        </div>
+        <p className="text-xs text-slate-600 leading-relaxed">
+          Saat tautan aplikasi dibagikan melalui WhatsApp, Telegram, Facebook, LinkedIn, atau Twitter, kartu pratinjau kaya (*OpenGraph & Twitter Card*) akan otomatis menampilkan logo resmi, judul aplikasi, dan ringkasan berikut:
+        </p>
+        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5 text-xs">
+          <div>
+            <strong className="text-slate-800">Judul Tautan (og:title):</strong>{' '}
+            <span className="text-slate-600">SIM-TK204 — Sistem Informasi Monitoring Tenaga Kerja Proyek Konstruksi</span>
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight">SIM-TK204</h1>
-            <p className="text-[10px] sm:text-xs text-orange-200 font-semibold tracking-wider uppercase">
-              Sistem Informasi Monitoring Tenaga Kerja Proyek Konstruksi
+            <strong className="text-slate-800">Deskripsi Resmi (og:description):</strong>{' '}
+            <span className="text-slate-600">
+              Aplikasi monitoring dan rekapitulasi harian/mingguan tenaga kerja proyek konstruksi dengan ekspor Excel (.xlsx), PDF A4 Landscape resmi, dan integrasi database Supabase.
+            </span>
+          </div>
+          <div>
+            <strong className="text-slate-800">Gambar Kartu (og:image):</strong>{' '}
+            <span className="text-slate-600 font-mono text-[11px]">/og-image.png (1200x630 High Definition Banner)</span>
+          </div>
+        </div>
+      </div>
+
+      {/* PWA Features & Capabilities */}
+      <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs space-y-3">
+        <div className="flex items-center gap-2 text-[#142B4A] font-bold text-sm">
+          <Smartphone className="w-5 h-5 text-[#F28C28]" />
+          <span>Keunggulan Progressive Web App (PWA) SIM-TK204</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+            <div className="flex items-center gap-2 font-bold text-slate-900 text-xs">
+              <Zap className="w-4 h-4 text-amber-500" />
+              <span>Instal Tanpa Toko Aplikasi</span>
+            </div>
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              Dapat langsung dipasang ke layar beranda HP Android, iPhone, tablet, maupun PC desktop tanpa perlu mengunduh file APK dari Play Store.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+            <div className="flex items-center gap-2 font-bold text-slate-900 text-xs">
+              <Wifi className="w-4 h-4 text-blue-500" />
+              <span>Dukungan Caching Cepat</span>
+            </div>
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              Service Worker menyimpan aset penting secara lokal sehingga aplikasi terbuka sekejap mata bahkan saat sinyal internet di lokasi proyek minim.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+            <div className="flex items-center gap-2 font-bold text-slate-900 text-xs">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <span>Tampilan Mandiri (Standalone)</span>
+            </div>
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              Bekerja di jendela layar penuh tanpa bilah peramban (URL bar), memberikan pengalaman seperti aplikasi native profesional.
             </p>
           </div>
         </div>
-        <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl">
-          Aplikasi administrasi dan monitoring tenaga kerja harian/mingguan yang dirancang khusus untuk kontraktor pelaksana, konsultan Manajemen Konstruksi (MK), dan direksi pekerjaan. Sistem ini memadukan pencatatan presisi lapangan, perhitungan kumulatif otomatis, visualisasi tren kehadiran, serta ekspor laporan administratif dalam format Excel (.xlsx) dan PDF resmi berstandar proyek.
-        </p>
       </div>
 
       {/* Grid of Key Features */}
@@ -47,7 +161,7 @@ export const AboutPage: React.FC = () => {
               <strong>Total Orang-Hari (OH):</strong> Penjumlahan seluruh tenaga kerja harian sepanjang rentang periode kalender.
             </li>
             <li>
-              <strong>Rata-rata Harian:</strong> Total Orang-Hari dibagi jumlah hari kalender laporan. Hari tanpa catatan dihitung sebagai nol untuk rata-rata kalender dengan indikator peringatan khusus.
+              <strong>Rata-rata Harian:</strong> Total Orang-Hari dibagi jumlah hari kalender laporan (misal 97 OH / 7 hari = 13,86 orang/hari).
             </li>
             <li>
               <strong>Puncak Tenaga Kerja:</strong> Nilai kehadiran tertinggi selama periode beserta tanggal pencapaiannya.
@@ -113,8 +227,8 @@ export const AboutPage: React.FC = () => {
             <div className="text-[11px] text-slate-500">Frontend Modular & Type-Safe</div>
           </div>
           <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-            <div className="font-bold text-slate-800">Tailwind CSS</div>
-            <div className="text-[11px] text-slate-500">Desain Responsif Mobile-First</div>
+            <div className="font-bold text-slate-800">Progressive Web App</div>
+            <div className="text-[11px] text-slate-500">Service Worker & Manifest</div>
           </div>
           <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
             <div className="font-bold text-slate-800">Supabase PostgreSQL</div>

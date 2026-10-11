@@ -9,8 +9,10 @@ import {
   Sparkles,
   UserCheck,
   X,
+  Share2,
 } from 'lucide-react';
 import { Project, UserProfile, UserRole } from '../../types';
+import { PWAInstallButton } from '../pwa/PWAInstallButton';
 
 interface NavbarProps {
   onToggleSidebar: () => void;
@@ -21,6 +23,7 @@ interface NavbarProps {
   currentUser: UserProfile;
   onRoleChange: (newRole: UserRole) => void;
   onOpenSettings: () => void;
+  onOpenShare?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -32,6 +35,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
   onRoleChange,
   onOpenSettings,
+  onOpenShare,
 }) => {
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
@@ -56,17 +60,24 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Menu className="w-6 h-6" />
           </button>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-[#F28C28] flex items-center justify-center shadow text-white font-black shrink-0">
-              <HardHat className="w-5 h-5 sm:w-6 sm:h-6" />
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden bg-[#F28C28] flex items-center justify-center shadow-md border border-orange-400/40 shrink-0">
+              <img
+                src="/pwa-192x192.png"
+                alt="Logo SIM-TK204"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/icon.svg';
+                }}
+              />
             </div>
             <div className="hidden xs:block sm:block">
               <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-sm sm:text-base md:text-lg tracking-wider text-white">
+                <span className="font-black text-sm sm:text-base md:text-lg tracking-wider text-white">
                   SIM-TK204
                 </span>
                 <span className="hidden md:inline-block text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-[#F28C28] border border-orange-500/30">
-                  v2.0 PRO
+                  v2.0 PWA
                 </span>
               </div>
               <p className="hidden lg:block text-[10px] text-slate-300 font-medium truncate max-w-[240px]">
@@ -150,8 +161,23 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </div>
 
-        {/* Right: Database Status & User Role Switcher */}
-        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+        {/* Right: PWA Install, Share, Database Status & User Role Switcher */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          {/* In-app PWA Install Button */}
+          <PWAInstallButton variant="navbar" />
+
+          {/* Share App Button */}
+          {onOpenShare && (
+            <button
+              onClick={onOpenShare}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/80 hover:text-white text-xs font-semibold transition-all min-h-[38px]"
+              title="Bagikan Tautan Aplikasi & Pratinjau Sosial"
+            >
+              <Share2 className="w-3.5 h-3.5 text-[#F28C28]" />
+              <span className="hidden sm:inline">Bagikan</span>
+            </button>
+          )}
+
           {/* Database indicator */}
           <button
             onClick={onOpenSettings}

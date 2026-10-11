@@ -2,13 +2,75 @@
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>SIM-TK204 — Sistem Informasi Monitoring Tenaga Kerja Proyek Konstruksi</title>
     <meta name="description" content="Aplikasi monitoring dan rekapitulasi harian/mingguan tenaga kerja proyek konstruksi dengan ekspor Excel, PDF, dan integrasi database Supabase." />
+    <meta name="author" content="SIM-TK204 Project Team" />
+    <meta name="keywords" content="SIM-TK204, monitoring tenaga kerja, proyek konstruksi, rekapitulasi man-days, orang hari, matriks tenaga kerja, laporan mingguan proyek, ekspor excel xlsx, ekspor pdf konstruksi" />
+
+    <!-- OpenGraph / Facebook / WhatsApp / Telegram Social Share -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="SIM-TK204" />
     <meta property="og:title" content="SIM-TK204 — Sistem Informasi Monitoring Tenaga Kerja Proyek Konstruksi" />
     <meta property="og:description" content="Aplikasi monitoring dan rekapitulasi harian/mingguan tenaga kerja proyek konstruksi dengan ekspor Excel, PDF, dan integrasi database Supabase." />
-    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image:secure_url" content="/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="SIM-TK204 — Logo dan Dasbor Monitoring Tenaga Kerja Proyek Konstruksi" />
+    <meta property="og:locale" content="id_ID" />
+
+    <!-- Twitter / X Cards -->
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="SIM-TK204 — Sistem Informasi Monitoring Tenaga Kerja Proyek Konstruksi" />
+    <meta name="twitter:description" content="Aplikasi monitoring dan rekapitulasi harian/mingguan tenaga kerja proyek konstruksi dengan ekspor Excel, PDF, dan integrasi database Supabase." />
+    <meta name="twitter:image" content="/og-image.png" />
+    <meta name="twitter:image:alt" content="SIM-TK204 — Monitoring Tenaga Kerja Proyek Konstruksi" />
+
+    <!-- PWA & Mobile Web App Meta Tags -->
+    <meta name="theme-color" content="#142B4A" />
+    <meta name="color-scheme" content="light" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SIM-TK204" />
+    <meta name="application-name" content="SIM-TK204" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Icons & Manifest -->
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
+    <!-- Schema.org Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "SIM-TK204",
+      "alternateName": "Sistem Informasi Monitoring Tenaga Kerja Proyek Konstruksi",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "All",
+      "browserRequirements": "Requires JavaScript. Requires HTML5.",
+      "description": "Aplikasi monitoring dan rekapitulasi harian/mingguan tenaga kerja proyek konstruksi dengan ekspor Excel, PDF, dan integrasi database Supabase.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "IDR"
+      },
+      "featureList": [
+        "Monitoring harian dan mingguan tenaga kerja proyek",
+        "Matriks orang-hari (OH) terpadu",
+        "Ekspor Excel resmi format OpenXML .xlsx 4 sheet",
+        "Ekspor PDF resmi A4 Landscape dengan kop proyek, catatan lapangan, dan tanda tangan 3 pihak",
+        "Integrasi PostgreSQL Supabase dengan RLS dan simulasi RBAC",
+        "Dukungan Progressive Web App (PWA) untuk instalasi di smartphone dan desktop"
+      ]
+    }
+    </script>
+
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
