@@ -1,0 +1,8 @@
+{
+  "name": "SIM-TK204 — Sistem Informasi Monitoring Tenaga Kerja Proyek Konstruksi",
+  "description": "Aplikasi monitoring dan rekapitulasi harian/mingguan tenaga kerja proyek konstruksi dengan ekspor Excel, PDF, dan integrasi database Supabase.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

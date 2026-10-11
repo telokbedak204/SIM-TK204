@@ -1,0 +1,262 @@
+import React, { useState } from 'react';
+import {
+  Menu,
+  Building2,
+  Database,
+  ShieldCheck,
+  ChevronDown,
+  HardHat,
+  Sparkles,
+  UserCheck,
+  X,
+} from 'lucide-react';
+import { Project, UserProfile, UserRole } from '../../types';
+
+interface NavbarProps {
+  onToggleSidebar: () => void;
+  activeProject: Project | null;
+  projects: Project[];
+  onSelectProject: (projectId: string) => void;
+  isSupabaseOnline: boolean;
+  currentUser: UserProfile;
+  onRoleChange: (newRole: UserRole) => void;
+  onOpenSettings: () => void;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({
+  onToggleSidebar,
+  activeProject,
+  projects,
+  onSelectProject,
+  isSupabaseOnline,
+  currentUser,
+  onRoleChange,
+  onOpenSettings,
+}) => {
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [showRoleDropdown, setShowRoleDropdown] = useState(false);
+
+  const roleLabels: Record<UserRole, { label: string; badge: string }> = {
+    admin: { label: 'Administrator', badge: 'bg-purple-100 text-purple-800 border-purple-200' },
+    project_manager: { label: 'Project Manager', badge: 'bg-blue-100 text-blue-800 border-blue-200' },
+    editor: { label: 'Site Editor / Pencatat', badge: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+    viewer: { label: 'Viewer (Hanya Lihat)', badge: 'bg-slate-100 text-slate-700 border-slate-200' },
+  };
+
+  return (
+    <header className="sticky top-0 z-40 bg-[#142B4A] text-white shadow-md border-b border-[#1c3a63] w-full min-w-0">
+      <div className="flex items-center justify-between px-2.5 sm:px-4 md:px-6 h-16 max-w-full">
+        {/* Left: Mobile hamburger & Logo */}
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0 min-w-0">
+          <button
+            onClick={onToggleSidebar}
+            className="lg:hidden w-11 h-11 flex items-center justify-center text-slate-200 hover:text-white hover:bg-slate-800/60 rounded-lg transition-colors shrink-0"
+            aria-label="Buka Menu"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-[#F28C28] flex items-center justify-center shadow text-white font-black shrink-0">
+              <HardHat className="w-5 h-5 sm:w-6 sm:h-6" />
+            </div>
+            <div className="hidden xs:block sm:block">
+              <div className="flex items-center gap-1.5">
+                <span className="font-extrabold text-sm sm:text-base md:text-lg tracking-wider text-white">
+                  SIM-TK204
+                </span>
+                <span className="hidden md:inline-block text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-[#F28C28] border border-orange-500/30">
+                  v2.0 PRO
+                </span>
+              </div>
+              <p className="hidden lg:block text-[10px] text-slate-300 font-medium truncate max-w-[240px]">
+                Monitoring Tenaga Kerja Proyek
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Center / Project Selector */}
+        <div className="relative flex-1 max-w-[150px] xs:max-w-[190px] sm:max-w-xs md:max-w-sm mx-1.5 sm:mx-3 min-w-0">
+          <button
+            onClick={() => {
+              setShowProjectDropdown(!showProjectDropdown);
+              setShowRoleDropdown(false);
+            }}
+            className="w-full flex items-center gap-1.5 sm:gap-2 bg-slate-900/60 hover:bg-slate-900/90 text-left px-2 sm:px-3 py-1.5 rounded-lg border border-slate-700/60 transition-all min-h-[44px]"
+            aria-label="Pilih Proyek Aktif"
+          >
+            <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#F28C28] shrink-0" />
+            <div className="min-w-0 flex-1">
+              <div className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 tracking-wider truncate">
+                Proyek Aktif
+              </div>
+              <div className="text-xs sm:text-sm font-semibold text-white truncate">
+                {activeProject ? activeProject.name : 'Pilih Proyek...'}
+              </div>
+            </div>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          </button>
+
+          {/* Project Dropdown: Responsive across 320px to desktop */}
+          {showProjectDropdown && (
+            <>
+              <div
+                className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-2xs sm:hidden"
+                onClick={() => setShowProjectDropdown(false)}
+              />
+              <div className="fixed top-16 left-2 right-2 sm:absolute sm:top-full sm:mt-2 sm:left-0 sm:right-auto sm:w-80 bg-white text-slate-800 rounded-xl shadow-2xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-2 max-w-[calc(100vw-16px)]">
+                <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Pilih Proyek Aktif</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-slate-500 font-semibold">{projects.length} Proyek</span>
+                    <button
+                      onClick={() => setShowProjectDropdown(false)}
+                      className="sm:hidden p-1 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="max-h-64 overflow-y-auto py-1">
+                  {projects.map((p) => {
+                    const isSelected = activeProject?.id === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          onSelectProject(p.id);
+                          setShowProjectDropdown(false);
+                        }}
+                        className={`w-full text-left px-3 py-2.5 hover:bg-slate-50 transition-colors flex items-start gap-2.5 min-h-[44px] ${
+                          isSelected ? 'bg-orange-50/80 border-l-4 border-[#F28C28]' : ''
+                        }`}
+                      >
+                        <Building2 className={`w-4 h-4 mt-0.5 shrink-0 ${isSelected ? 'text-[#F28C28]' : 'text-slate-400'}`} />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-semibold text-slate-900 truncate">{p.name}</div>
+                          <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                            <span className="font-mono">{p.code}</span>
+                            <span>•</span>
+                            <span className="capitalize">{p.status}</span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Right: Database Status & User Role Switcher */}
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          {/* Database indicator */}
+          <button
+            onClick={onOpenSettings}
+            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all ${
+              isSupabaseOnline
+                ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300 hover:bg-emerald-900/60'
+                : 'bg-amber-950/50 border-amber-500/50 text-amber-300 hover:bg-amber-900/60'
+            }`}
+            title={isSupabaseOnline ? 'Supabase PostgreSQL Terhubung' : 'Mode Offline / Demo Lokal (Klik untuk setel Supabase)'}
+          >
+            <Database className="w-3.5 h-3.5" />
+            <span>{isSupabaseOnline ? 'Supabase Online' : 'Mode Demo'}</span>
+          </button>
+
+          {/* User profile & Role switcher */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowRoleDropdown(!showRoleDropdown);
+                setShowProjectDropdown(false);
+              }}
+              className="flex items-center gap-1.5 sm:gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 transition-colors min-h-[44px]"
+              aria-label="Profil Pengguna & Simulasi Hak Akses"
+            >
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#F28C28] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                {currentUser.full_name.charAt(0)}
+              </div>
+              <div className="hidden lg:block text-left max-w-[120px]">
+                <div className="text-xs font-semibold text-white leading-tight truncate">{currentUser.full_name}</div>
+                <div className="text-[10px] text-[#F28C28] leading-tight font-medium truncate">
+                  {roleLabels[currentUser.role]?.label || currentUser.role}
+                </div>
+              </div>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            </button>
+
+            {/* Role Dropdown: Responsive across 320px to desktop */}
+            {showRoleDropdown && (
+              <>
+                <div
+                  className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-2xs sm:hidden"
+                  onClick={() => setShowRoleDropdown(false)}
+                />
+                <div className="fixed top-16 left-2 right-2 sm:absolute sm:top-full sm:mt-2 sm:right-0 sm:left-auto sm:w-64 bg-white text-slate-800 rounded-xl shadow-2xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-2 max-w-[calc(100vw-16px)]">
+                  <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">{currentUser.full_name}</div>
+                      <div className="text-[11px] text-slate-500 truncate">{currentUser.email}</div>
+                    </div>
+                    <button
+                      onClick={() => setShowRoleDropdown(false)}
+                      className="sm:hidden p-1 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="p-2">
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1 flex items-center justify-between">
+                      <span>Simulasi Peran (RBAC)</span>
+                      <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
+                    </div>
+                    {(['admin', 'project_manager', 'editor', 'viewer'] as UserRole[]).map((r) => {
+                      const isCurrent = currentUser.role === r;
+                      return (
+                        <button
+                          key={r}
+                          onClick={() => {
+                            onRoleChange(r);
+                            setShowRoleDropdown(false);
+                          }}
+                          className={`w-full text-left px-2.5 py-2 rounded-md text-xs flex items-center justify-between transition-colors min-h-[40px] ${
+                            isCurrent
+                              ? 'bg-slate-100 font-bold text-[#142B4A]'
+                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <UserCheck className={`w-3.5 h-3.5 ${isCurrent ? 'text-[#F28C28]' : 'text-slate-400'}`} />
+                            <span>{roleLabels[r].label}</span>
+                          </div>
+                          {isCurrent && <span className="text-[10px] text-emerald-600 font-bold">Aktif</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="border-t border-slate-100 px-2 pt-2">
+                    <button
+                      onClick={() => {
+                        onOpenSettings();
+                        setShowRoleDropdown(false);
+                      }}
+                      className="w-full text-left px-2.5 py-2 text-xs text-slate-700 hover:bg-slate-100 rounded-md transition-colors min-h-[40px] flex items-center gap-2"
+                    >
+                      <Database className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Pengaturan & Koneksi Supabase...</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+};
