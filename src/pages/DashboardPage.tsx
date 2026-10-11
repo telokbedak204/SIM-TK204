@@ -58,7 +58,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         <div className="absolute top-0 right-0 w-96 h-96 bg-[#F28C28]/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="space-y-2">
+          <div className="space-y-2 min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-orange-500/20 text-[#F28C28] border border-orange-500/30">
                 {project.code}
@@ -68,7 +68,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               </span>
             </div>
 
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+            <h1 className="text-lg sm:text-xl md:text-2xl font-black text-white tracking-tight break-words leading-snug">
               {project.name}
             </h1>
 

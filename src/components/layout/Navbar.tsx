@@ -87,26 +87,29 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Center / Project Selector */}
-        <div className="relative flex-1 max-w-[150px] xs:max-w-[190px] sm:max-w-xs md:max-w-sm mx-1.5 sm:mx-3 min-w-0">
+        {/* Center / Project Selector: Expands flexibly, truncates gracefully */}
+        <div className="relative flex-1 min-w-0 max-w-[140px] xs:max-w-[200px] sm:max-w-xs md:max-w-sm lg:max-w-md mx-1 sm:mx-3">
           <button
             onClick={() => {
               setShowProjectDropdown(!showProjectDropdown);
               setShowRoleDropdown(false);
             }}
-            className="w-full flex items-center gap-1.5 sm:gap-2 bg-slate-900/60 hover:bg-slate-900/90 text-left px-2 sm:px-3 py-1.5 rounded-lg border border-slate-700/60 transition-all min-h-[44px]"
+            className="w-full flex items-center justify-between gap-1 sm:gap-2 bg-slate-900/70 hover:bg-slate-900 text-left px-2 sm:px-3 py-1.5 rounded-lg border border-slate-700/70 transition-all min-h-[42px] sm:min-h-[44px]"
             aria-label="Pilih Proyek Aktif"
+            title={activeProject ? activeProject.name : 'Pilih Proyek...'}
           >
-            <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#F28C28] shrink-0" />
-            <div className="min-w-0 flex-1">
-              <div className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 tracking-wider truncate">
-                Proyek Aktif
-              </div>
-              <div className="text-xs sm:text-sm font-semibold text-white truncate">
-                {activeProject ? activeProject.name : 'Pilih Proyek...'}
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
+              <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#F28C28] shrink-0" />
+              <div className="min-w-0 flex-1 overflow-hidden">
+                <div className="text-[9px] uppercase font-bold text-slate-400 tracking-wider truncate hidden xs:block">
+                  Proyek Aktif
+                </div>
+                <div className="text-xs sm:text-sm font-semibold text-white truncate block">
+                  {activeProject ? activeProject.name : 'Pilih Proyek...'}
+                </div>
               </div>
             </div>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-0.5" />
           </button>
 
           {/* Project Dropdown: Responsive across 320px to desktop */}
@@ -170,11 +173,12 @@ export const Navbar: React.FC<NavbarProps> = ({
           {onOpenShare && (
             <button
               onClick={onOpenShare}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/80 hover:text-white text-xs font-semibold transition-all min-h-[38px]"
+              className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/80 hover:text-white text-xs font-semibold transition-all min-h-[38px]"
               title="Bagikan Tautan Aplikasi & Pratinjau Sosial"
+              aria-label="Bagikan Tautan Aplikasi"
             >
               <Share2 className="w-3.5 h-3.5 text-[#F28C28]" />
-              <span className="hidden sm:inline">Bagikan</span>
+              <span className="hidden md:inline">Bagikan</span>
             </button>
           )}
 

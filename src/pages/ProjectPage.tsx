@@ -164,7 +164,7 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({
                   </div>
                 </div>
 
-                <h3 className="font-bold text-slate-900 text-base leading-snug line-clamp-2 mb-2">
+                <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-snug line-clamp-2 break-words mb-2">
                   {p.name}
                 </h3>
 

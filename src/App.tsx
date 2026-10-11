@@ -9,6 +9,7 @@ import { exportWeeklyMonitoringToPDF } from './lib/pdfExport';
 // Layout Components
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar, NavigationTab } from './components/layout/Sidebar';
+import { BottomNav } from './components/layout/BottomNav';
 import { ToastContainer, ToastMessage } from './components/ui/Notification';
 import { ShareAppModal } from './components/pwa/ShareAppModal';
 import { OfflineIndicator } from './components/pwa/OfflineIndicator';
@@ -262,7 +263,7 @@ export default function App() {
         />
 
         {/* Content Area */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-2.5 sm:p-5 lg:p-8 min-w-0 w-full">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-2.5 sm:p-5 lg:p-8 pb-24 sm:pb-24 lg:pb-8 min-w-0 w-full">
           <div className="max-w-7xl mx-auto w-full min-w-0">
             {/* Tab Routing */}
             {currentTab === 'dashboard' && activeProject && (
@@ -370,6 +371,14 @@ export default function App() {
 
       {/* Offline Connectivity Status Toast */}
       <OfflineIndicator />
+
+      {/* Mobile Bottom Navigation Bar (Phone Screens) */}
+      <BottomNav
+        currentTab={currentTab}
+        onSelectTab={(tab) => setCurrentTab(tab)}
+        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+        isSidebarOpen={isSidebarOpen}
+      />
     </div>
   );
 }
