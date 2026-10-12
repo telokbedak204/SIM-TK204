@@ -421,7 +421,9 @@ export class DataService {
       }
 
       if (roles.length > 0) {
-        const { error: roleErr } = await client.from('job_roles').upsert(roles);
+        const { error: roleErr } = await client
+          .from('job_roles')
+          .upsert(roles, { onConflict: 'project_id,name' });
         if (roleErr) throw new Error(`Tabel job_roles: ${roleErr.message}`);
       }
 
@@ -437,7 +439,11 @@ export class DataService {
         message: `Sinkronisasi berhasil! ${projects.length} Proyek, ${roles.length} Jabatan, dan ${manpower.length} Catatan Harian berhasil disimpan permanen ke Supabase PostgreSQL.`,
       };
     } catch (err) {
-      return { success: false, message: (err as Error).message };
+      const errMsg = (err as Error).message;
+      return {
+        success: false,
+        message: errMsg,
+      };
     }
   }
 

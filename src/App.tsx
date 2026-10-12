@@ -456,6 +456,7 @@ export default function App() {
               <SettingsPage
                 onRefreshData={loadData}
                 onNavigateToProjects={() => setCurrentTab('projects')}
+                onNavigateToUserRoles={() => setCurrentTab('user_roles')}
                 addToast={addToast}
               />
             )}

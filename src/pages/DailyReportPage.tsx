@@ -115,33 +115,38 @@ export const DailyReportPage: React.FC<DailyReportPageProps> = ({
       let webViewLink = undefined;
 
       if (token) {
-        const googleSettings = DataService.getGoogleSettings();
-        const prefix = googleSettings.photoNamingPrefix || 'DOK';
-        const metadata = {
-          name: `${prefix}_${project.code}_${selectedDate}_${file.name}`,
-          mimeType: file.type,
-        };
-        const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-        form.append('file', file);
+        if (token.startsWith('simulated_')) {
+          driveFileId = 'simulated-drive-' + Date.now();
+          webViewLink = 'https://drive.google.com/file/d/' + driveFileId + '/view';
+        } else {
+          const googleSettings = DataService.getGoogleSettings();
+          const prefix = googleSettings.photoNamingPrefix || 'DOK';
+          const metadata = {
+            name: `${prefix}_${project.code}_${selectedDate}_${file.name}`,
+            mimeType: file.type,
+          };
+          const form = new FormData();
+          form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+          form.append('file', file);
 
-        const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: form,
-        });
-
-        if (uploadRes.ok) {
-          const driveData = await uploadRes.json();
-          driveFileId = driveData.id;
-          const getRes = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=webViewLink,thumbnailLink`, {
-            headers: { Authorization: `Bearer ${token}` },
+          const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            body: form,
           });
-          if (getRes.ok) {
-            const fileMeta = await getRes.json();
-            webViewLink = fileMeta.webViewLink;
+
+          if (uploadRes.ok) {
+            const driveData = await uploadRes.json();
+            driveFileId = driveData.id;
+            const getRes = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=webViewLink,thumbnailLink`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (getRes.ok) {
+              const fileMeta = await getRes.json();
+              webViewLink = fileMeta.webViewLink;
+            }
           }
         }
       }

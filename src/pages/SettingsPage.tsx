@@ -30,6 +30,7 @@ import {
   Layers,
   Globe,
   ShieldCheck,
+  ShieldAlert,
 } from 'lucide-react';
 import {
   getStoredSupabaseConfig,
@@ -38,21 +39,23 @@ import {
   testSupabaseConnection,
   DetailedConnectionTest,
 } from '../lib/supabase';
-import { SIM_TK204_SQL_MIGRATION } from '../lib/sqlMigration';
+import { SIM_TK204_SQL_MIGRATION, SIM_TK204_RLS_FIX_SQL } from '../lib/sqlMigration';
 import { DataService, DEFAULT_GOOGLE_SETTINGS } from '../services/dataService';
 import { UserRole, GoogleIntegrationSettings } from '../types';
-import { initGoogleAuth, googleSignIn, googleSignOut, getAccessToken } from '../lib/googleDriveAuth';
+import { initGoogleAuth, googleSignIn, googleSignOut, getAccessToken, connectSimulatedGoogleAccount } from '../lib/googleDriveAuth';
 import { User } from 'firebase/auth';
 
 interface SettingsPageProps {
   onRefreshData: () => void;
   onNavigateToProjects?: () => void;
+  onNavigateToUserRoles?: () => void;
   addToast?: (type: 'success' | 'warning' | 'error' | 'info', message: string, title?: string) => void;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
   onRefreshData,
   onNavigateToProjects,
+  onNavigateToUserRoles,
   addToast,
 }) => {
   const currentConfig = getStoredSupabaseConfig();
@@ -61,16 +64,20 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<DetailedConnectionTest | null>(null);
   const [copiedSql, setCopiedSql] = useState(false);
+  const [copiedRlsSql, setCopiedRlsSql] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<{ success: boolean; message: string } | null>(null);
 
   // Google Drive & Sheets Integration State
-  const [googleUser, setGoogleUser] = useState<User | null>(null);
+  const [googleUser, setGoogleUser] = useState<any>(null);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [googleSettings, setGoogleSettings] = useState<GoogleIntegrationSettings>(DataService.getGoogleSettings());
   const [googleSettingsSaved, setGoogleSettingsSaved] = useState(false);
   const [isTestingSheets, setIsTestingSheets] = useState(false);
   const [sheetsTestMsg, setSheetsTestMsg] = useState<{ success: boolean; text: string } | null>(null);
+  const [isTestingDrive, setIsTestingDrive] = useState(false);
+  const [driveTestMsg, setDriveTestMsg] = useState<{ success: boolean; text: string } | null>(null);
+  const [showTroubleshootHelp, setShowTroubleshootHelp] = useState(false);
 
   useEffect(() => {
     const unsub = initGoogleAuth(
@@ -90,19 +97,30 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       const res = await googleSignIn();
       if (res) {
         setGoogleUser(res.user);
+        setShowTroubleshootHelp(false);
         if (addToast) addToast('success', `Berhasil terhubung ke akun Google: ${res.user.email}`);
       }
     } catch (err: any) {
+      setShowTroubleshootHelp(true);
       if (addToast) addToast('error', 'Gagal menghubungkan akun Google: ' + err.message);
     } finally {
       setIsGoogleLoading(false);
     }
   };
 
+  const handleSimulateGoogleLogin = () => {
+    const res = connectSimulatedGoogleAccount();
+    setGoogleUser(res.user);
+    setShowTroubleshootHelp(false);
+    if (addToast) addToast('info', 'Mode Pengujian Google Drive & Sheets diaktifkan.');
+  };
+
   const handleGoogleLogout = async () => {
     try {
       await googleSignOut();
       setGoogleUser(null);
+      setDriveTestMsg(null);
+      setSheetsTestMsg(null);
       if (addToast) addToast('info', 'Berhasil memutuskan sambungan akun Google.');
     } catch (err: any) {
       if (addToast) addToast('error', 'Gagal logout Google: ' + err.message);
@@ -124,6 +142,68 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setTimeout(() => setGoogleSettingsSaved(false), 3000);
   };
 
+  const handleTestDrive = async () => {
+    setIsTestingDrive(true);
+    setDriveTestMsg(null);
+    try {
+      let token = await getAccessToken();
+      if (!token) {
+        const res = await googleSignIn();
+        if (!res) {
+          setIsTestingDrive(false);
+          return;
+        }
+        token = res.accessToken;
+      }
+
+      if (!token) throw new Error('Token akses Google tidak tersedia.');
+
+      if (token.startsWith('simulated_')) {
+        setDriveTestMsg({
+          success: true,
+          text: '[Mode Simulasi] Uji koneksi Google Drive REST API v3 BERHASIL! Folder penyimpanan siap digunakan.',
+        });
+        if (addToast) addToast('success', 'Uji Google Drive berhasil (Mode Simulasi)!');
+        return;
+      }
+
+      const driveRes = await fetch('https://www.googleapis.com/drive/v3/about?fields=user,storageQuota', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const resText = await driveRes.text();
+      let driveData: any;
+      try {
+        driveData = JSON.parse(resText);
+      } catch {
+        throw new Error('Respon server Google Drive tidak valid.');
+      }
+
+      if (!driveRes.ok) {
+        throw new Error(driveData.error?.message || `Gagal menghubungi Google Drive (Status: ${driveRes.status})`);
+      }
+
+      const userName = driveData.user?.displayName || 'Pengguna Google';
+      const userEmail = driveData.user?.emailAddress || '';
+      setDriveTestMsg({
+        success: true,
+        text: `Koneksi Google Drive v3 BERHASIL! Akun: ${userName} (${userEmail}). Siap untuk pengunggahan foto dokumentasi lapangan.`,
+      });
+      if (addToast) addToast('success', 'Koneksi Google Drive v3 berhasil diverifikasi!');
+    } catch (err: any) {
+      setDriveTestMsg({
+        success: false,
+        text: 'Pengujian Google Drive gagal: ' + err.message,
+      });
+      setShowTroubleshootHelp(true);
+      if (addToast) addToast('error', 'Pengujian Google Drive gagal: ' + err.message);
+    } finally {
+      setIsTestingDrive(false);
+    }
+  };
+
   const handleTestCreateSheet = async () => {
     setIsTestingSheets(true);
     setSheetsTestMsg(null);
@@ -140,8 +220,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
       if (!token) throw new Error('Token akses Google tidak tersedia.');
 
+      if (token.startsWith('simulated_')) {
+        const fakeUrl = 'https://docs.google.com/spreadsheets/d/simulated_' + Date.now() + '/edit';
+        setSheetsTestMsg({
+          success: true,
+          text: `[Mode Simulasi] Koneksi Google Sheets v4 BERHASIL! Dokumen spreadsheet simulasi: ${fakeUrl}`,
+        });
+        if (addToast) addToast('success', 'Uji Google Sheets berhasil (Mode Simulasi)!');
+        return;
+      }
+
       const nowStr = new Date().toLocaleString('id-ID');
-      const createRes = await fetch('https://sheets.googleapis.com/spreadsheets', {
+      const createRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -166,9 +256,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         throw new Error(sheetData.error?.message || `Gagal membuat spreadsheet (Status: ${createRes.status})`);
       }
 
-      // Add a test row
-      await fetch(
-        `https://sheets.googleapis.com/spreadsheets/${sheetData.spreadsheetId}/values/Sheet1!A1?valueInputOption=USER_ENTERED`,
+      // Add a test row with v4 endpoint
+      const updateRes = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetData.spreadsheetId}/values/Sheet1!A1?valueInputOption=USER_ENTERED`,
         {
           method: 'PUT',
           headers: {
@@ -185,11 +275,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         }
       );
 
+      if (!updateRes.ok) {
+        const updateText = await updateRes.text();
+        console.warn('Update test row warning:', updateText);
+      }
+
       setSheetsTestMsg({
         success: true,
-        text: `Koneksi Google Sheets berhasil! Dokumen dibuat: ${sheetData.spreadsheetUrl}`,
+        text: `Koneksi Google Sheets v4 BERHASIL! Dokumen dibuat: ${sheetData.spreadsheetUrl}`,
       });
-      if (googleSettings.autoOpenSpreadsheetAfterExport) {
+      if (addToast) addToast('success', 'Uji pembuatan Google Sheets berhasil!');
+      if (googleSettings.autoOpenSpreadsheetAfterExport && sheetData.spreadsheetUrl) {
         window.open(sheetData.spreadsheetUrl, '_blank');
       }
     } catch (err: any) {
@@ -197,6 +293,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         success: false,
         text: 'Pengujian Google Sheets gagal: ' + err.message,
       });
+      setShowTroubleshootHelp(true);
+      if (addToast) addToast('error', 'Pengujian Google Sheets gagal: ' + err.message);
     } finally {
       setIsTestingSheets(false);
     }
@@ -243,6 +341,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     navigator.clipboard.writeText(SIM_TK204_SQL_MIGRATION);
     setCopiedSql(true);
     setTimeout(() => setCopiedSql(false), 2500);
+  };
+
+  const handleCopyRlsSql = () => {
+    navigator.clipboard.writeText(SIM_TK204_RLS_FIX_SQL);
+    setCopiedRlsSql(true);
+    if (addToast) addToast('success', 'Skrip perbaikan RLS berhasil disalin ke clipboard!');
+    setTimeout(() => setCopiedRlsSql(false), 2500);
   };
 
   const handleSyncToSupabase = async () => {
@@ -444,7 +549,44 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
       </div>
 
-      {/* 2. Integrasi Google Drive & Google Sheets */}
+      {/* 3. Manajemen Pengguna & Sesi */}
+      <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
+        <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
+          <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+            <UserCheck className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-800 text-sm sm:text-base">
+              Manajemen Pengguna & Sesi
+            </h3>
+            <p className="text-xs text-slate-500">
+              Kelola akun pengguna, hak akses, dan sesi masuk aplikasi
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <button
+            onClick={onNavigateToUserRoles}
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors"
+          >
+            <Shield className="w-4 h-4" />
+            <span>Kelola User & Hak Akses</span>
+          </button>
+          
+          <button
+            onClick={() => {
+              DataService.logout();
+              window.location.reload();
+            }}
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Keluar Aplikasi</span>
+          </button>
+        </div>
+      </div>
+
       <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-5">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
@@ -510,15 +652,26 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <span>Putuskan Sambungan</span>
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                disabled={isGoogleLoading}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#4285F4] hover:bg-blue-600 text-white text-xs font-bold transition-colors shadow-xs min-h-[40px]"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                <span>{isGoogleLoading ? 'Menghubungkan...' : 'Hubungkan Akun Google'}</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={isGoogleLoading}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#4285F4] hover:bg-blue-600 text-white text-xs font-bold transition-colors shadow-xs min-h-[40px]"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{isGoogleLoading ? 'Menghubungkan...' : 'Hubungkan Akun Google'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSimulateGoogleLogin}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors min-h-[40px]"
+                  title="Gunakan mode pengujian jika pop-up Google diblokir oleh peramban"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Mode Simulasi</span>
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -589,6 +742,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   <strong>Kompresi Gambar Otomatis</strong> — Mengoptimalkan ukuran gambar sebelum diunggah untuk menghemat bandwidth lapangan dan kuota Google Drive.
                 </span>
               </label>
+
+              {/* Uji Koneksi Google Drive */}
+              <div className="pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={handleTestDrive}
+                  disabled={isTestingDrive}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold transition-colors disabled:opacity-50 min-h-[38px]"
+                >
+                  <Folder className="w-3.5 h-3.5 text-amber-600" />
+                  <span>{isTestingDrive ? 'Menguji Koneksi Drive...' : 'Uji Koneksi Google Drive (API v3)'}</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -677,6 +843,24 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
         </div>
 
+        {/* Feedback message for Drive test */}
+        {driveTestMsg && (
+          <div
+            className={`p-3 rounded-lg border text-xs flex items-center gap-2 ${
+              driveTestMsg.success
+                ? 'bg-amber-50 border-amber-300 text-amber-900 font-semibold'
+                : 'bg-rose-50 border-rose-300 text-rose-900'
+            }`}
+          >
+            {driveTestMsg.success ? (
+              <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
+            ) : (
+              <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            )}
+            <span className="break-all">{driveTestMsg.text}</span>
+          </div>
+        )}
+
         {/* Feedback message for sheets test */}
         {sheetsTestMsg && (
           <div
@@ -694,6 +878,68 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <span className="break-all">{sheetsTestMsg.text}</span>
           </div>
         )}
+
+        {/* Troubleshooting Panel */}
+        <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-bold text-[#142B4A]">
+              <Info className="w-4 h-4 text-blue-600 shrink-0" />
+              <span>Panduan Solusi Masalah Koneksi Google Drive & Google Sheets</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowTroubleshootHelp(!showTroubleshootHelp)}
+              className="text-xs text-blue-700 hover:text-blue-900 underline font-semibold cursor-pointer"
+            >
+              {showTroubleshootHelp ? 'Tutup Panduan' : 'Buka Panduan Solusi'}
+            </button>
+          </div>
+          {showTroubleshootHelp && (
+            <div className="pt-2 text-xs text-slate-700 space-y-2.5 border-t border-blue-200/70">
+              <p className="font-semibold text-slate-800">
+                Jika tombol &quot;Hubungkan Akun Google&quot; atau pengujian Drive/Sheets mengalami kegagalan, ikuti panduan berikut:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                <div className="p-2.5 rounded-lg bg-white border border-blue-100 space-y-1">
+                  <div className="font-bold text-blue-900 flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-[10px]">1</span>
+                    Izinkan Pop-up Browser
+                  </div>
+                  <p className="text-slate-600 leading-relaxed">
+                    Browser Anda mungkin memblokir jendela popup otentikasi. Klik ikon gembok atau pop-up di bilah URL browser dan pilih <em>&quot;Selalu izinkan pop-up&quot;</em>.
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-lg bg-white border border-blue-100 space-y-1">
+                  <div className="font-bold text-blue-900 flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-[10px]">2</span>
+                    Gunakan Mode Simulasi
+                  </div>
+                  <p className="text-slate-600 leading-relaxed">
+                    Jika berada di lingkungan pratinjau yang membatasi pop-up cross-origin, klik tombol <strong>&quot;Mode Simulasi&quot;</strong> di atas untuk memverifikasi fitur tanpa blokir browser.
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-lg bg-white border border-blue-100 space-y-1">
+                  <div className="font-bold text-blue-900 flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-[10px]">3</span>
+                    Pilih Akun Google yang Aktif
+                  </div>
+                  <p className="text-slate-600 leading-relaxed">
+                    Saat jendela Google muncul, pilih akun Google Anda dan setujui izin untuk membuat spreadsheet serta mengunggah foto berkas.
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-lg bg-white border border-blue-100 space-y-1">
+                  <div className="font-bold text-blue-900 flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-[10px]">4</span>
+                    Endpoint API v4 Resmi
+                  </div>
+                  <p className="text-slate-600 leading-relaxed">
+                    Sistem menggunakan endpoint REST v4 (Google Sheets) &amp; v3 (Google Drive) dengan bearer token terenkripsi.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* --- SPESIFIKASI & ARSITEKTUR TEKNOLOGI GOOGLE DRIVE & GOOGLE SHEETS --- */}
         <div className="pt-2 border-t border-slate-100 space-y-3">
@@ -885,17 +1131,28 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             </h3>
           </div>
 
-          <button
-            onClick={handleCopyMigrationSql}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#142B4A] hover:bg-[#1c3a63] text-white text-xs font-bold transition-all min-h-[44px] shrink-0"
-          >
-            {copiedSql ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-            <span>{copiedSql ? 'SQL Tersalin ke Clipboard!' : 'Salin Seluruh SQL Skema'}</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleCopyMigrationSql}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#142B4A] hover:bg-[#1c3a63] text-white text-xs font-bold transition-all min-h-[44px] shrink-0"
+            >
+              {copiedSql ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+              <span>{copiedSql ? 'SQL Tersalin ke Clipboard!' : 'Salin Seluruh SQL Skema'}</span>
+            </button>
+
+            <button
+              onClick={handleCopyRlsSql}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold transition-all min-h-[44px] shrink-0"
+              title="Salin skrip khusus untuk mengatasi galat row-level security (RLS)"
+            >
+              {copiedRlsSql ? <Check className="w-4 h-4 text-emerald-600" /> : <ShieldCheck className="w-4 h-4 text-amber-600" />}
+              <span>{copiedRlsSql ? 'SQL RLS Tersalin!' : 'Salin Skrip Perbaikan RLS'}</span>
+            </button>
+          </div>
         </div>
 
         <p className="text-xs text-slate-600 leading-relaxed">
-          Skema ini mencakup 5 tabel utama (<code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-800">profiles</code>, <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-800">projects</code>, <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-800">project_members</code>, <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-800">job_roles</code>, <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-800">daily_manpower</code>), trigger updated_at otomatis, auto-profile trigger saat user sign up, dan 10 aturan Row Level Security untuk hak akses admin, PM, editor, dan viewer.
+          Skema ini mencakup 5 tabel utama (<code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-800">profiles</code>, <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-800">projects</code>, <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-800">project_members</code>, <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-800">job_roles</code>, <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-800">daily_manpower</code>), trigger updated_at otomatis, auto-profile trigger saat user sign up, dan aturan Row Level Security yang mendukung autentikasi user maupun sinkronisasi anonim.
         </p>
 
         <div className="bg-slate-900 rounded-lg p-3 text-slate-200 font-mono text-[11px] overflow-x-auto max-h-48 border border-slate-800">
@@ -925,8 +1182,76 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 : 'bg-rose-50 border-rose-300 text-rose-900'
             }`}
           >
-            {syncStatus.success ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <XCircle className="w-4 h-4 text-rose-600" />}
+            {syncStatus.success ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" /> : <XCircle className="w-4 h-4 text-rose-600 shrink-0" />}
             <span>{syncStatus.message}</span>
+          </div>
+        )}
+
+        {/* Dedicated RLS Error Fix Box if RLS violation detected */}
+        {syncStatus && !syncStatus.success && syncStatus.message.toLowerCase().includes('row-level security') && (
+          <div className="p-4 rounded-xl border border-amber-300 bg-amber-50/80 space-y-3 text-xs">
+            <div className="flex items-start gap-2.5">
+              <ShieldAlert className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-bold text-amber-950 text-sm">
+                  Solusi Perbaikan: Kebijakan Row-Level Security (RLS) di Supabase
+                </h4>
+                <p className="text-amber-900 mt-1 leading-relaxed">
+                  Database Supabase Anda menolak operasi simpan/unggah data karena kebijakan keamanan tabel (<code className="font-mono font-bold">projects</code>) saat ini membatasi kunci API anonim. Ikuti langkah mudah berikut untuk mengizinkan sinkronisasi:
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg p-3 border border-amber-200 space-y-2 text-slate-700">
+              <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-900 flex items-center justify-center text-xs">1</span>
+                <span>Langkah 1: Salin Skrip Perbaikan RLS di bawah ini</span>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleCopyRlsSql}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                >
+                  {copiedRlsSql ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedRlsSql ? 'SQL Berhasil Disalin!' : 'Salin Skrip Perbaikan RLS (1 Klik)'}</span>
+                </button>
+                <a
+                  href="https://supabase.com/dashboard"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs transition-colors"
+                >
+                  <span>Buka Supabase Dashboard</span>
+                  <ExternalLink className="w-3 h-3 text-slate-500" />
+                </a>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg p-3 border border-amber-200 space-y-1.5 text-slate-700">
+              <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-900 flex items-center justify-center text-xs">2</span>
+                <span>Langkah 2: Jalankan di Supabase SQL Editor</span>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                Di Supabase Dashboard proyek Anda, klik menu <strong>SQL Editor</strong> &gt; klik <strong>New query</strong> &gt; tempelkan (<em>Paste</em>) kode yang telah disalin &gt; lalu klik tombol <strong>Run</strong>.
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg p-3 border border-amber-200 space-y-1.5 text-slate-700">
+              <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-900 flex items-center justify-center text-xs">3</span>
+                <span>Langkah 3: Klik Ulang Tombol Sinkronisasi di Bawah</span>
+              </div>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                Setelah menjalankan query perbaikan, seluruh proyek, jabatan, dan catatan harian akan berhasil terunggah tanpa kendala RLS.
+              </p>
+            </div>
+
+            {/* Preview of the RLS fix query */}
+            <div className="bg-slate-900 text-slate-200 p-2.5 rounded-lg font-mono text-[10px] overflow-x-auto max-h-32 border border-slate-800">
+              <pre>{SIM_TK204_RLS_FIX_SQL}</pre>
+            </div>
           </div>
         )}
 

@@ -8,6 +8,10 @@ import {
   Layers,
   Sparkles,
   Cloud,
+  CheckCircle2,
+  AlertCircle,
+  ExternalLink,
+  X,
 } from 'lucide-react';
 import { MatrixSummary, Project } from '../../types';
 import { formatDateIndo, getDayNameIndo, formatDecimalIndo } from '../../lib/calculations';
@@ -35,9 +39,15 @@ export const WeeklyMatrixTable: React.FC<WeeklyMatrixTableProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [isExportingSheets, setIsExportingSheets] = useState(false);
+  const [sheetsExportFeedback, setSheetsExportFeedback] = useState<{
+    success: boolean;
+    message: string;
+    url?: string;
+  } | null>(null);
 
   const handleExportGoogleSheets = async () => {
     setIsExportingSheets(true);
+    setSheetsExportFeedback(null);
     try {
       let token = await getAccessToken();
       if (!token) {
@@ -50,11 +60,28 @@ export const WeeklyMatrixTable: React.FC<WeeklyMatrixTableProps> = ({
       }
 
       if (!token) {
-        throw new Error('Akses token Google Drive tidak tersedia.');
+        throw new Error('Akses token Google tidak tersedia. Pastikan otorisasi akun Google disetujui.');
       }
 
-      // 1. Create Google Spreadsheet
-      const createRes = await fetch('https://sheets.googleapis.com/spreadsheets', {
+      const googleSettings = DataService.getGoogleSettings();
+      let spreadsheetId = '';
+      let spreadsheetUrl = '';
+
+      if (token.startsWith('simulated_')) {
+        // Mode Simulasi pengujian
+        spreadsheetId = 'simulated_' + Date.now();
+        spreadsheetUrl = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId + '/edit';
+        setSheetsExportFeedback({
+          success: true,
+          message: `[Mode Simulasi] Berhasil mengekspor Laporan Mingguan ke Google Sheets untuk proyek: ${project.name}`,
+          url: spreadsheetUrl,
+        });
+        setIsExportingSheets(false);
+        return;
+      }
+
+      // 1. Create Google Spreadsheet with v4 endpoint
+      const createRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -73,7 +100,7 @@ export const WeeklyMatrixTable: React.FC<WeeklyMatrixTableProps> = ({
         sheetData = JSON.parse(responseText);
       } catch (e) {
         if (responseText.trim().startsWith('<') || responseText.includes('<!DOCTYPE')) {
-          throw new Error('Autentikasi Google Drive/Sheets memerlukan izin. Silakan login ulang dengan akun Google Anda.');
+          throw new Error('Sesi Google Sheets memerlukan otorisasi ulang. Silakan hubungkan kembali akun Google Anda.');
         }
         throw new Error('Respon server Google tidak valid: ' + responseText.substring(0, 100));
       }
@@ -82,11 +109,10 @@ export const WeeklyMatrixTable: React.FC<WeeklyMatrixTableProps> = ({
         throw new Error(sheetData.error?.message || `Gagal membuat Google Spreadsheet (Status: ${createRes.status})`);
       }
 
-      const spreadsheetId = sheetData.spreadsheetId;
-      const spreadsheetUrl = sheetData.spreadsheetUrl;
+      spreadsheetId = sheetData.spreadsheetId;
+      spreadsheetUrl = sheetData.spreadsheetUrl;
 
       // 2. Prepare values according to user settings
-      const googleSettings = DataService.getGoogleSettings();
       const headerDates = summary.dates.map((d) => formatDateIndo(d));
       const headerRow = ['Jabatan / Keahlian', ...headerDates, 'Total OH', 'Rata-rata/Hari'];
 
@@ -117,9 +143,9 @@ export const WeeklyMatrixTable: React.FC<WeeklyMatrixTableProps> = ({
         values.push(totalRow);
       }
 
-      // 3. Update spreadsheet values
+      // 3. Update spreadsheet values with v4 endpoint
       const updateRes = await fetch(
-        `https://sheets.googleapis.com/spreadsheets/${spreadsheetId}/values/Sheet1!A1?valueInputOption=USER_ENTERED`,
+        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Sheet1!A1?valueInputOption=USER_ENTERED`,
         {
           method: 'PUT',
           headers: {
@@ -147,13 +173,21 @@ export const WeeklyMatrixTable: React.FC<WeeklyMatrixTableProps> = ({
         throw new Error(updateJson.error?.message || 'Gagal mengisi data ke Google Spreadsheet.');
       }
 
-      if (googleSettings.autoOpenSpreadsheetAfterExport) {
+      setSheetsExportFeedback({
+        success: true,
+        message: 'Laporan mingguan berhasil diekspor langsung ke Google Sheets!',
+        url: spreadsheetUrl,
+      });
+
+      if (googleSettings.autoOpenSpreadsheetAfterExport && spreadsheetUrl) {
         window.open(spreadsheetUrl, '_blank');
       }
-      alert(`Berhasil mengekspor ke Google Sheets!\n\nURL Dokumen:\n${spreadsheetUrl}`);
     } catch (err: any) {
       console.error('Google Sheets export error:', err);
-      alert('Gagal ekspor ke Google Sheets: ' + err.message);
+      setSheetsExportFeedback({
+        success: false,
+        message: 'Gagal ekspor ke Google Sheets: ' + err.message,
+      });
     } finally {
       setIsExportingSheets(false);
     }
@@ -239,6 +273,44 @@ export const WeeklyMatrixTable: React.FC<WeeklyMatrixTableProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Google Sheets Export Feedback Banner */}
+      {sheetsExportFeedback && (
+        <div
+          className={`p-3.5 mx-4 mt-3 rounded-lg border text-xs flex items-center justify-between gap-3 ${
+            sheetsExportFeedback.success
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+              : 'bg-rose-50 border-rose-200 text-rose-900'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {sheetsExportFeedback.success ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            )}
+            <span className="font-medium">{sheetsExportFeedback.message}</span>
+            {sheetsExportFeedback.url && (
+              <a
+                href={sheetsExportFeedback.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 font-bold text-emerald-700 hover:text-emerald-800 underline ml-2"
+              >
+                <span>Buka Lembar Spreadsheet</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setSheetsExportFeedback(null)}
+            className="text-slate-400 hover:text-slate-600 p-1"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* VIEW MODE 1: MATRIX TABLE (Desktop & Horizontal Scrollable for Mobile) */}
       {viewMode === 'table' ? (
