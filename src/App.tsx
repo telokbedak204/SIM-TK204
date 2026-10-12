@@ -144,6 +144,12 @@ export default function App() {
   };
 
   const handleRoleChange = (newRole: UserRole) => {
+    // Only admins can change roles, and only in a real auth context.
+    // In production this should be a protected server-side action.
+    if (currentUser.role !== 'admin') {
+      addToast('error', 'Akses ditolak: Hanya Administrator yang berhak mengatur role.');
+      return;
+    }
     DataService.setSimulatedRole(newRole);
     const updated = DataService.getCurrentUser();
     setCurrentUser(updated);
@@ -337,6 +343,7 @@ export default function App() {
           onOpenShare={() => setIsShareModalOpen(true)}
           onLogout={handleLogout}
           onOpenLogin={() => setIsLoginModalOpen(true)}
+          currentUserRole={currentUser.role}
         />
 
         {/* Content Area */}

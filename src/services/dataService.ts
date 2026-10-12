@@ -605,14 +605,123 @@ export class DataService {
   }
 
   static async saveProject(project: Partial<Project> & { id?: string }): Promise<Project> {
-    const isNew = !project.id;
-    // Generate valid RFC4122 UUID for PostgreSQL compatibility
-    const id = project.id || generateUUID();
     const now = new Date().toISOString();
     const user = this.getCurrentUser();
+    let targetId = project.id && isValidUUID(project.id) ? project.id : undefined;
+
+    let existingDbProject: { id: string; created_at?: string } | null = null;
+
+    if (isSupabaseConfigured()) {
+      const client = getSupabase();
+      if (client) {
+        // 1. Look for existing project by ID first (if provided)
+        if (targetId) {
+          const { data } = await client
+            .from('projects')
+            .select('id, created_at')
+            .eq('id', targetId)
+            .maybeSingle();
+          if (data) {
+            existingDbProject = data;
+          }
+        }
+
+        // 2. If not found by ID, look up by project code
+        if (!existingDbProject && project.code?.trim()) {
+          const { data } = await client
+            .from('projects')
+            .select('id, created_at')
+            .eq('code', project.code.trim())
+            .maybeSingle();
+          if (data) {
+            existingDbProject = data;
+          }
+        }
+
+        if (existingDbProject) {
+          // This is an UPDATE of an existing project
+          // CRITICAL: Keep targetId identical to existingDbProject.id
+          targetId = existingDbProject.id;
+
+          // Payload for UPDATE:
+          // NEVER include 'id', 'created_by', or 'created_at' in update payload!
+          // Modifying or sending 'id' violates foreign key constraints on referencing tables (job_roles, daily_manpower, project_members)
+          const updatePayload: Record<string, any> = {
+            code: project.code?.trim(),
+            name: project.name?.trim() || 'Proyek Baru',
+            owner_name: project.owner_name?.trim() || '',
+            contractor_name: project.contractor_name?.trim() || '',
+            consultant_name: project.consultant_name?.trim() || '',
+            location: project.location?.trim() || '',
+            start_date: project.start_date || '2026-10-01',
+            end_date: project.end_date || '2026-12-31',
+            project_manager: project.project_manager?.trim() || '',
+            site_manager: project.site_manager?.trim() || '',
+            recorder_name: project.recorder_name?.trim() || '',
+            inspector_name: project.inspector_name?.trim() || '',
+            status: project.status || 'active',
+            updated_at: now,
+          };
+
+          const { error } = await client
+            .from('projects')
+            .update(updatePayload)
+            .eq('id', existingDbProject.id);
+
+          if (error) {
+            throw new Error(`Gagal memperbarui ke database Supabase: ${error.message}`);
+          }
+        } else {
+          // This is an INSERT of a new project
+          if (!targetId) {
+            targetId = generateUUID();
+          }
+
+          const insertPayload: Record<string, any> = {
+            id: targetId,
+            code: project.code?.trim() || `PRJ-${Date.now().toString().slice(-4)}`,
+            name: project.name?.trim() || 'Proyek Baru',
+            owner_name: project.owner_name?.trim() || '',
+            contractor_name: project.contractor_name?.trim() || '',
+            consultant_name: project.consultant_name?.trim() || '',
+            location: project.location?.trim() || '',
+            start_date: project.start_date || '2026-10-01',
+            end_date: project.end_date || '2026-12-31',
+            project_manager: project.project_manager?.trim() || '',
+            site_manager: project.site_manager?.trim() || '',
+            recorder_name: project.recorder_name?.trim() || '',
+            inspector_name: project.inspector_name?.trim() || '',
+            status: project.status || 'active',
+            created_at: now,
+            updated_at: now,
+          };
+
+          if (user.id && isValidUUID(user.id)) {
+            insertPayload.created_by = user.id;
+          }
+
+          const { error } = await client
+            .from('projects')
+            .insert([insertPayload]);
+
+          if (error) {
+            throw new Error(`Gagal menyimpan ke database Supabase: ${error.message}`);
+          }
+        }
+
+        // Ensure default roles exist for this project (without throwing FK errors)
+        if (targetId) {
+          await this.seedDefaultRolesForProject(targetId);
+        }
+      }
+    }
+
+    if (!targetId) {
+      targetId = generateUUID();
+    }
 
     const fullProject: Project = {
-      id,
+      id: targetId,
       code: project.code?.trim() || `PRJ-${Date.now().toString().slice(-4)}`,
       name: project.name?.trim() || 'Proyek Baru',
       owner_name: project.owner_name?.trim() || '',
@@ -626,60 +735,23 @@ export class DataService {
       recorder_name: project.recorder_name?.trim() || '',
       inspector_name: project.inspector_name?.trim() || '',
       status: project.status || 'active',
-      created_at: project.created_at || now,
+      created_at: existingDbProject?.created_at || project.created_at || now,
       updated_at: now,
     };
-    
-    // Remove created_by to let Supabase handle it server-side (via RLS/auth.uid())
-    delete fullProject.created_by;
-
-    // Save to Supabase if online
-    if (isSupabaseConfigured()) {
-      const client = getSupabase();
-      if (client) {
-        // Look for existing project by code
-        const { data: existingProject } = await client
-          .from('projects')
-          .select('id')
-          .eq('code', fullProject.code)
-          .maybeSingle();
-
-        if (existingProject) {
-          // Perform update
-          const updatePayload = { ...fullProject };
-          delete updatePayload.created_by;
-          
-          const { error } = await client
-            .from('projects')
-            .update(updatePayload)
-            .eq('id', existingProject.id);
-          if (error) throw new Error(`Gagal memperbarui ke database Supabase: ${error.message}`);
-        } else {
-          // Perform insert
-          const { error } = await client
-            .from('projects')
-            .insert([fullProject]);
-          if (error) throw new Error(`Gagal menyimpan ke database Supabase: ${error.message}`);
-        }
-        
-        // Seed default 8 roles in Supabase if new or existing project to ensure FK integrity
-        await this.seedDefaultRolesForProject(id);
-      }
-    }
 
     // Local storage persistence
     const list = await this.getProjects();
-    const existingIdx = list.findIndex((p) => p.id === id);
+    const existingIdx = list.findIndex((p) => p.id === targetId || p.code === fullProject.code);
     if (existingIdx >= 0) {
       list[existingIdx] = fullProject;
     } else {
       list.unshift(fullProject);
       if (!isSupabaseConfigured()) {
-        await this.seedDefaultRolesForProject(id);
+        await this.seedDefaultRolesForProject(targetId);
       }
     }
     localStorage.setItem(KEY_PROJECTS, JSON.stringify(list));
-    this.setActiveProject(id);
+    this.setActiveProject(targetId);
 
     return fullProject;
   }
@@ -688,6 +760,14 @@ export class DataService {
     if (isSupabaseConfigured()) {
       const client = getSupabase();
       if (client) {
+        // Cascade delete child tables first to ensure foreign key constraints are not violated
+        try {
+          await client.from('daily_manpower').delete().eq('project_id', id);
+          await client.from('job_roles').delete().eq('project_id', id);
+          await client.from('project_members').delete().eq('project_id', id);
+        } catch (e) {
+          console.warn('Error clearing child records before project deletion:', e);
+        }
         const { error } = await client.from('projects').delete().eq('id', id);
         if (error) throw new Error(`Gagal menghapus dari Supabase: ${error.message}`);
       }
@@ -752,7 +832,7 @@ export class DataService {
     ];
 
     const now = new Date().toISOString();
-    const newRoles: JobRole[] = defaultRoleNames.map((name, idx) => ({
+    const defaultRoles: JobRole[] = defaultRoleNames.map((name, idx) => ({
       id: generateUUID(),
       project_id: projectId,
       name,
@@ -766,13 +846,44 @@ export class DataService {
       const client = getSupabase();
       if (client) {
         try {
-          // For existing projects, ensure roles exist.
-          // This prevents potential FK issues if roles were partially deleted or missing
-          await client.from('job_roles').upsert(newRoles, {
-            onConflict: 'project_id,name',
-          });
+          // 1. Verify that project actually exists in Supabase projects table
+          const { data: projectRow } = await client
+            .from('projects')
+            .select('id')
+            .eq('id', projectId)
+            .maybeSingle();
+
+          if (projectRow) {
+            // 2. Fetch existing roles for this project
+            const { data: existingDbRoles } = await client
+              .from('job_roles')
+              .select('name')
+              .eq('project_id', projectId);
+
+            const existingNames = new Set((existingDbRoles || []).map((r) => r.name.toLowerCase()));
+
+            // 3. Only insert roles that do not already exist
+            const rolesToInsert: JobRole[] = [];
+            defaultRoleNames.forEach((name, idx) => {
+              if (!existingNames.has(name.toLowerCase())) {
+                rolesToInsert.push({
+                  id: generateUUID(),
+                  project_id: projectId,
+                  name,
+                  sort_order: idx + 1,
+                  is_active: true,
+                  created_at: now,
+                  updated_at: now,
+                });
+              }
+            });
+
+            if (rolesToInsert.length > 0) {
+              await client.from('job_roles').insert(rolesToInsert);
+            }
+          }
         } catch (e) {
-          console.warn('Error seeding/updating Supabase roles:', e);
+          console.warn('Error seeding Supabase roles:', e);
         }
       }
     }
@@ -780,15 +891,15 @@ export class DataService {
     const allRoles: JobRole[] = JSON.parse(localStorage.getItem(KEY_ROLES) || '[]');
     const existing = allRoles.filter((r) => r.project_id === projectId);
     if (existing.length === 0) {
-      allRoles.push(...newRoles);
+      allRoles.push(...defaultRoles);
       localStorage.setItem(KEY_ROLES, JSON.stringify(allRoles));
-      return newRoles;
+      return defaultRoles;
     }
     return existing;
   }
 
   static async saveJobRole(role: Partial<JobRole> & { project_id: string; name: string }): Promise<JobRole> {
-    const id = role.id || generateUUID();
+    const id = role.id && isValidUUID(role.id) ? role.id : generateUUID();
     const now = new Date().toISOString();
 
     const fullRole: JobRole = {
@@ -804,15 +915,41 @@ export class DataService {
     if (isSupabaseConfigured()) {
       const client = getSupabase();
       if (client) {
-        const { error } = await client.from('job_roles').upsert([fullRole]);
-        if (error) {
-          throw new Error(`Gagal menyimpan jabatan ke Supabase: ${error.message}`);
+        // Check if role exists by id or by (project_id, name)
+        let existingRole: { id: string } | null = null;
+        if (role.id) {
+          const { data } = await client.from('job_roles').select('id').eq('id', role.id).maybeSingle();
+          if (data) existingRole = data;
+        }
+        if (!existingRole) {
+          const { data } = await client
+            .from('job_roles')
+            .select('id')
+            .eq('project_id', role.project_id)
+            .eq('name', role.name.trim())
+            .maybeSingle();
+          if (data) existingRole = data;
+        }
+
+        if (existingRole) {
+          fullRole.id = existingRole.id;
+          const roleUpdate = {
+            name: fullRole.name,
+            sort_order: fullRole.sort_order,
+            is_active: fullRole.is_active,
+            updated_at: now,
+          };
+          const { error } = await client.from('job_roles').update(roleUpdate).eq('id', existingRole.id);
+          if (error) throw new Error(`Gagal memperbarui jabatan di Supabase: ${error.message}`);
+        } else {
+          const { error } = await client.from('job_roles').insert([fullRole]);
+          if (error) throw new Error(`Gagal menyimpan jabatan ke Supabase: ${error.message}`);
         }
       }
     }
 
     const allRoles: JobRole[] = JSON.parse(localStorage.getItem(KEY_ROLES) || '[]');
-    const idx = allRoles.findIndex((r) => r.id === id);
+    const idx = allRoles.findIndex((r) => r.id === fullRole.id || (r.project_id === fullRole.project_id && r.name.toLowerCase() === fullRole.name.toLowerCase()));
     if (idx >= 0) {
       allRoles[idx] = fullRole;
     } else {
@@ -970,16 +1107,6 @@ export class DataService {
    */
   static resetToDemoData() {
     this.initializeLocalData(true);
-  }
-
-  static clearAllData() {
-    if (typeof window === 'undefined') return;
-    localStorage.removeItem(KEY_PROJECTS);
-    localStorage.removeItem(KEY_ROLES);
-    localStorage.removeItem(KEY_MANPOWER);
-    localStorage.removeItem(KEY_DAILY_REPORTS);
-    localStorage.removeItem(KEY_ACTIVE_PROJECT);
-    localStorage.setItem(KEY_DEMO_LOADED, 'true');
   }
 
   // --- DAILY REPORT NARRATIVES ---

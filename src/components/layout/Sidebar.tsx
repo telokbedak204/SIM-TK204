@@ -18,6 +18,7 @@ import {
   LogIn,
 } from 'lucide-react';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
+import { UserRole } from '../../types';
 
 export type NavigationTab =
   | 'dashboard'
@@ -39,6 +40,7 @@ interface SidebarProps {
   onOpenShare?: () => void;
   onLogout?: () => void;
   onOpenLogin?: () => void;
+  currentUserRole: UserRole;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -49,6 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenShare,
   onLogout,
   onOpenLogin,
+  currentUserRole,
 }) => {
   const menuItems: { id: NavigationTab; label: string; icon: React.ReactNode; badge?: string }[] = [
     {
@@ -103,7 +106,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Tentang Aplikasi',
       icon: <Info className="w-5 h-5" />,
     },
-  ];
+  ].filter(item => {
+    if (currentUserRole !== 'admin' && (item.id === 'user_roles' || item.id === 'settings')) {
+      return false;
+    }
+    return true;
+  });
 
   const handleNav = (tab: NavigationTab) => {
     onSelectTab(tab);

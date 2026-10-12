@@ -85,7 +85,11 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
     }
 
     setIsSubmitting(true);
-    const success = await onSave(formData);
+    const payload: Partial<Project> = {
+      ...formData,
+      ...(initialProject?.id ? { id: initialProject.id } : {}),
+    };
+    const success = await onSave(payload);
     setIsSubmitting(false);
 
     if (success) {
