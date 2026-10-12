@@ -639,7 +639,7 @@ export class DataService {
     if (isSupabaseConfigured()) {
       const client = getSupabase();
       if (client) {
-        const { error } = await client.from('projects').upsert([fullProject]);
+        const { error } = await client.from('projects').upsert([fullProject], { onConflict: 'code' });
         if (error) {
           throw new Error(`Gagal menyimpan ke database Supabase: ${error.message}`);
         }
