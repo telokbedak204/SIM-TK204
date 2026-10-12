@@ -258,7 +258,7 @@ export class DataService {
   static isLoggedIn(): boolean {
     if (typeof window === 'undefined') return true;
     const val = localStorage.getItem('sim_tk204_is_logged_in');
-    return val !== 'false';
+    return val === 'true';
   }
 
   static setSimulatedRole(role: UserRole) {
