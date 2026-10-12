@@ -1,6 +1,6 @@
 import { Project, JobRole, DailyManpower, UserProfile, UserRole, DailyReportNarrative, AppNotification, DriveDocumentationPhoto, GoogleIntegrationSettings } from '../types';
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase';
-import { generateUUID } from '../lib/uuid';
+import { generateUUID, isValidUUID } from '../lib/uuid';
 
 // Local storage keys for offline caching and demo persistence
 const KEY_PROJECTS = 'sim_tk204_projects';
@@ -627,7 +627,7 @@ export class DataService {
       inspector_name: project.inspector_name?.trim() || '',
       status: project.status || 'active',
       // Ensure created_by is only sent if it is a valid UUID, otherwise let Supabase handle default
-      created_by: user.id && user.id.length > 5 ? user.id : undefined,
+      created_by: user.id && isValidUUID(user.id) ? user.id : undefined,
       created_at: project.created_at || now,
       updated_at: now,
     };
@@ -641,14 +641,30 @@ export class DataService {
     if (isSupabaseConfigured()) {
       const client = getSupabase();
       if (client) {
-        const { error } = await client.from('projects').upsert([fullProject], { onConflict: 'code' });
-        if (error) {
-          throw new Error(`Gagal menyimpan ke database Supabase: ${error.message}`);
+        // Look for existing project by code
+        const { data: existingProject } = await client
+          .from('projects')
+          .select('id')
+          .eq('code', fullProject.code)
+          .maybeSingle();
+
+        if (existingProject) {
+          // Perform update
+          const { error } = await client
+            .from('projects')
+            .update(fullProject)
+            .eq('id', existingProject.id);
+          if (error) throw new Error(`Gagal memperbarui ke database Supabase: ${error.message}`);
+        } else {
+          // Perform insert
+          const { error } = await client
+            .from('projects')
+            .insert([fullProject]);
+          if (error) throw new Error(`Gagal menyimpan ke database Supabase: ${error.message}`);
         }
-        // Seed default 8 roles in Supabase if new project
-        if (isNew) {
-          await this.seedDefaultRolesForProject(id);
-        }
+        
+        // Seed default 8 roles in Supabase if new or existing project to ensure FK integrity
+        await this.seedDefaultRolesForProject(id);
       }
     }
 
@@ -751,9 +767,13 @@ export class DataService {
       const client = getSupabase();
       if (client) {
         try {
-          await client.from('job_roles').upsert(newRoles);
+          // For existing projects, ensure roles exist.
+          // This prevents potential FK issues if roles were partially deleted or missing
+          await client.from('job_roles').upsert(newRoles, {
+            onConflict: 'project_id,name',
+          });
         } catch (e) {
-          console.warn('Error seeding Supabase roles:', e);
+          console.warn('Error seeding/updating Supabase roles:', e);
         }
       }
     }
@@ -888,7 +908,7 @@ export class DataService {
       work_date: workDate,
       worker_count: Math.max(0, Math.floor(entry.worker_count || 0)),
       notes: entry.notes?.trim() || '',
-      created_by: user.id && user.id.includes('-') ? user.id : undefined,
+      created_by: user.id && isValidUUID(user.id) ? user.id : undefined,
       created_at: now,
       updated_at: now,
     }));
