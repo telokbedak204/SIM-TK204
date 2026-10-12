@@ -12,6 +12,7 @@ import {
   Users,
   Check,
   AlertTriangle,
+  Trash2,
 } from 'lucide-react';
 import { Project, ProjectStatus, UserProfile } from '../types';
 import { ProjectModal } from '../components/projects/ProjectModal';
@@ -40,6 +41,7 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [selectedDetailProject, setSelectedDetailProject] = useState<Project | null>(null);
   const [archiveTargetProject, setArchiveTargetProject] = useState<Project | null>(null);
+  const [deleteTargetProject, setDeleteTargetProject] = useState<Project | null>(null);
 
   const filteredProjects = projects.filter((p) => {
     const matchSearch =
@@ -222,6 +224,15 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({
                         aria-label="Edit Proyek"
                       >
                         <Edit className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        onClick={() => setDeleteTargetProject(p)}
+                        className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-slate-500 hover:text-rose-700 hover:bg-rose-50 transition-colors"
+                        title="Hapus Proyek"
+                        aria-label="Hapus Proyek"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </button>
 
                       {p.status !== 'archived' && (
