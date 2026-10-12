@@ -624,7 +624,7 @@ export class DataService {
       recorder_name: project.recorder_name?.trim() || '',
       inspector_name: project.inspector_name?.trim() || '',
       status: project.status || 'active',
-      created_by: user.id && user.id.includes('-') ? user.id : undefined,
+      created_by: user.id && user.id.length > 5 ? user.id : '00000000-0000-0000-0000-000000000000',
       created_at: project.created_at || now,
       updated_at: now,
     };
