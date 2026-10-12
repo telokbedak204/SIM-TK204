@@ -203,7 +203,7 @@ export class DataService {
   static getSystemUsers(): { id: string; name: string; email: string; role: UserRole; company: string; password?: string; is_active: boolean }[] {
     const KEY_SYSTEM_USERS = 'sim_tk204_system_users';
     const INITIAL_USERS = [
-      { id: 'usr-1', name: 'Ir. Hendra Wijaya, MT', email: 'hendra.pm@simtk204.id', role: 'admin' as UserRole, company: 'PT. Bahtera Karya Anambas', password: 'adminpassword123', is_active: true },
+      { id: 'usr-1', name: 'Super Admin', email: 'telokbedak204@gmail.com', role: 'admin' as UserRole, company: 'PT. Bahtera Karya Anambas', password: 'qweasd123', is_active: true },
       { id: 'usr-2', name: 'Rian Pratama, ST', email: 'rian.site@simtk204.id', role: 'project_manager' as UserRole, company: 'PT. Teknik Eksakta', password: 'password123', is_active: true },
       { id: 'usr-3', name: 'Ahmad Faisal', email: 'faisal.admin@simtk204.id', role: 'editor' as UserRole, company: 'PT. Teknik Eksakta', password: 'password123', is_active: true },
       { id: 'usr-4', name: 'Dedi Kurniawan, ST', email: 'dedi.mk@simtk204.id', role: 'viewer' as UserRole, company: 'PT. Arcansia Dwitama Konsultan', password: 'password123', is_active: true },
