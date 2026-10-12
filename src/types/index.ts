@@ -61,6 +61,21 @@ export interface DailyManpower {
   updated_at: string;
 }
 
+export interface DailyReportNarrative {
+  project_id: string;
+  work_date: string; // YYYY-MM-DD
+  rencana_m6: string;
+  realisasi_m6: string;
+  deviasi_m6: string;
+  pekerjaan: string;
+  peralatan: string;
+  kendala: string;
+  cuaca: string;
+  material_masuk: string;
+  saran: string;
+  updated_at: string;
+}
+
 export interface MatrixRow {
   roleId: string;
   roleName: string;

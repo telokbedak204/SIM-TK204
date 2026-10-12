@@ -17,6 +17,7 @@ import { OfflineIndicator } from './components/pwa/OfflineIndicator';
 // Pages
 import { DashboardPage } from './pages/DashboardPage';
 import { DailyInputPage } from './pages/DailyInputPage';
+import { DailyReportPage } from './pages/DailyReportPage';
 import { WeeklyReportPage } from './pages/WeeklyReportPage';
 import { ProjectPage } from './pages/ProjectPage';
 import { JobRolesPage } from './pages/JobRolesPage';
@@ -294,6 +295,17 @@ export default function App() {
                 currentUser={currentUser}
                 onDateChange={(d) => setSelectedDailyDate(d)}
                 onSaveBatch={handleSaveBatch}
+              />
+            )}
+
+            {currentTab === 'daily_report' && activeProject && (
+              <DailyReportPage
+                project={activeProject}
+                jobRoles={jobRoles}
+                dailyRecords={dailyRecords}
+                selectedDate={selectedDailyDate}
+                onDateChange={(d) => setSelectedDailyDate(d)}
+                addToast={addToast}
               />
             )}
 

@@ -12,9 +12,10 @@ import {
   Clock,
   History,
   ShieldAlert,
+  Sparkles,
 } from 'lucide-react';
 import { Project, JobRole, DailyManpower, UserProfile } from '../../types';
-import { formatDateIndo, getDayNameIndo } from '../../lib/calculations';
+import { formatDateIndo, getDayNameIndo, formatDateIndoFull } from '../../lib/calculations';
 import { validateWorkerCount } from '../../lib/validation';
 
 interface DailyInputFormProps {
@@ -111,6 +112,36 @@ export const DailyInputForm: React.FC<DailyInputFormProps> = ({
         notes,
       },
     }));
+    setIsDirty(true);
+  };
+
+  // 0. Load official Anambas Oct 11 report template
+  const handleLoadAnambasOct11Template = () => {
+    onDateChange('2026-10-11');
+    const newValues: Record<string, { count: number; notes: string }> = {};
+    activeRoles.forEach((role) => {
+      let count = 0;
+      let notes = '';
+      const nameLower = role.name.toLowerCase();
+      if (nameLower.includes('project manager') || nameLower === 'pm') {
+        count = 1;
+        notes = 'Rencana M6: 1,755% | Realisasi M6: 3,483% | Deviasi: +1,728%';
+      } else if (nameLower.includes('surveyor')) {
+        count = 1;
+        notes = 'Surveyor = 1 orang';
+      } else if (nameLower.includes('hse')) {
+        count = 1;
+        notes = 'HSE = 1 orang | Cuaca: Jam 08:00 - 17.00 Cerah | Kendala: Material utama belum ada | Saran: Di tambah dudukan alas pijakan, agar pekerja lebih aman; Lakukan mapping pekerjaan';
+      } else if (nameLower.includes('mandor')) {
+        count = 0;
+        notes = 'Mandor = 0 orang';
+      } else if (nameLower.includes('pekerja')) {
+        count = 0;
+        notes = 'Pekerja = 0 orang';
+      }
+      newValues[role.id] = { count, notes };
+    });
+    setFormValues(newValues);
     setIsDirty(true);
   };
 
@@ -250,6 +281,16 @@ export const DailyInputForm: React.FC<DailyInputFormProps> = ({
         {/* Quick Toolbar: Copy yesterday, copy specific date, clear */}
         <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleLoadAnambasOct11Template}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-100 hover:bg-orange-200 text-[#F28C28] text-xs font-bold transition-colors min-h-[44px] shadow-2xs"
+              title="Muat laporan harian resmi Pasar Loka (11 Okt 2026)"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-[#F28C28]" />
+              <span>📋 Muat Laporan Harian (11 Okt 2026)</span>
+            </button>
+
             <button
               type="button"
               onClick={handleCopyYesterday}

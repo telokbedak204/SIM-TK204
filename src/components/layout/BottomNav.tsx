@@ -2,6 +2,7 @@ import React from 'react';
 import {
   LayoutDashboard,
   ClipboardEdit,
+  FileText,
   FileSpreadsheet,
   Building2,
   Menu,
@@ -23,6 +24,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 }) => {
   // Tabs that are directly on the bottom bar
   const isMenuTabActive = [
+    'projects',
     'job_roles',
     'history',
     'settings',
@@ -39,17 +41,17 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       id: 'daily_input' as NavigationTab,
       label: 'Input TK',
       icon: ClipboardEdit,
+    },
+    {
+      id: 'daily_report' as NavigationTab,
+      label: 'Lap. Harian',
+      icon: FileText,
       isHighlighted: true,
     },
     {
       id: 'weekly_report' as NavigationTab,
-      label: 'Laporan',
+      label: 'Mingguan',
       icon: FileSpreadsheet,
-    },
-    {
-      id: 'projects' as NavigationTab,
-      label: 'Proyek',
-      icon: Building2,
     },
   ];
 

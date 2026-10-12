@@ -1,4 +1,4 @@
-import { Project, JobRole, DailyManpower, UserProfile, UserRole } from '../types';
+import { Project, JobRole, DailyManpower, UserProfile, UserRole, DailyReportNarrative } from '../types';
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase';
 import { generateUUID } from '../lib/uuid';
 
@@ -6,6 +6,7 @@ import { generateUUID } from '../lib/uuid';
 const KEY_PROJECTS = 'sim_tk204_projects';
 const KEY_ROLES = 'sim_tk204_roles';
 const KEY_MANPOWER = 'sim_tk204_manpower';
+const KEY_DAILY_REPORTS = 'sim_tk204_daily_reports';
 const KEY_ACTIVE_PROJECT = 'sim_tk204_active_project_id';
 const KEY_CURRENT_USER = 'sim_tk204_current_user';
 const KEY_DEMO_LOADED = 'sim_tk204_demo_loaded';
@@ -25,20 +26,20 @@ export const DEFAULT_USER: UserProfile = {
 export const INITIAL_DEMO_PROJECT: Project = {
   id: DEMO_PROJECT_ID,
   code: 'PRJ-2026-ANB-04',
-  name: 'Lanjutan Renovasi Pasar Loka – Kepulauan Anambas',
+  name: 'Manajemen Konstruksi Lanjutan Renovasi Pasar Loka Kab. Kep. Anambas',
   owner_name: 'Pemerintah Kabupaten Kepulauan Anambas / Disperindag',
-  contractor_name: 'PT. Bahtera Karya Anambas',
-  consultant_name: 'PT. Rekayasa Multi Konsultan MK',
-  location: 'Tarempa Barat, Kec. Siantan, Kab. Kepulauan Anambas',
-  start_date: '2026-10-01',
+  contractor_name: 'PT. Teknik Eksakta',
+  consultant_name: 'PT. Arcansia Dwitama Konsultan KSO PT. Teknik Eksakta',
+  location: 'Kab. Kep. Anambas',
+  start_date: '2026-08-28',
   end_date: '2026-12-31',
   project_manager: 'Ir. Hendra Wijaya, MT',
   site_manager: 'Rian Pratama, ST',
   recorder_name: 'Ahmad Faisal (Site Admin)',
   inspector_name: 'Dedi Kurniawan, ST (Inspector MK)',
   status: 'active',
-  created_at: '2026-10-01T08:00:00.000Z',
-  updated_at: '2026-10-01T08:00:00.000Z',
+  created_at: '2026-08-28T08:00:00.000Z',
+  updated_at: '2026-10-11T08:00:00.000Z',
 };
 
 export const INITIAL_DEMO_ROLES: JobRole[] = [
@@ -54,10 +55,7 @@ export const INITIAL_DEMO_ROLES: JobRole[] = [
 
 /**
  * Generate standard demo daily records:
- * Periode: 2–8 Oktober 2026
- * Pekerja: 11, 11, 8, 8, 8, 8, 8
- * PM: 1, Mandor: 1, KTukang: 0, Surveyor: 1, Sondir: 0, Drafter: 0, HSE: 2
- * Daily sums: 16, 16, 13, 13, 13, 13, 13 => Total: 97 OH, Rata-rata: 13,86
+ * Periode: 2–8 Oktober 2026 & 11 Oktober 2026 (Pasar Loka Anambas)
  */
 export function generateDemoRecords(): DailyManpower[] {
   const dates = [
@@ -68,20 +66,22 @@ export function generateDemoRecords(): DailyManpower[] {
     '2026-10-06',
     '2026-10-07',
     '2026-10-08',
+    '2026-10-11',
   ];
-  const pekerjaDaily = [11, 11, 8, 8, 8, 8, 8];
+  const pekerjaDaily = [11, 11, 8, 8, 8, 8, 8, 0];
 
   const records: DailyManpower[] = [];
 
   dates.forEach((dateStr, idx) => {
+    const isOct11 = dateStr === '2026-10-11';
     records.push(
       {
         id: generateUUID(),
         project_id: DEMO_PROJECT_ID,
         job_role_id: '00000000-0000-0000-0000-000000000001', // PM
         work_date: dateStr,
-        worker_count: 1,
-        notes: 'Koordinasi umum dan site inspection',
+        worker_count: isOct11 ? 1 : 1,
+        notes: isOct11 ? 'Rencana M6: 1,755% | Realisasi M6: 3,483% | Deviasi: +1,728%' : 'Koordinasi umum dan site inspection',
         created_at: `${dateStr}T17:00:00.000Z`,
         updated_at: `${dateStr}T17:00:00.000Z`,
       },
@@ -90,8 +90,8 @@ export function generateDemoRecords(): DailyManpower[] {
         project_id: DEMO_PROJECT_ID,
         job_role_id: '00000000-0000-0000-0000-000000000002', // Mandor
         work_date: dateStr,
-        worker_count: 1,
-        notes: 'Pengawasan pekerjaan pembesian dan bekisting',
+        worker_count: isOct11 ? 0 : 1,
+        notes: isOct11 ? 'Mandor = 0 orang' : 'Pengawasan pekerjaan pembesian dan bekisting',
         created_at: `${dateStr}T17:00:00.000Z`,
         updated_at: `${dateStr}T17:00:00.000Z`,
       },
@@ -110,8 +110,8 @@ export function generateDemoRecords(): DailyManpower[] {
         project_id: DEMO_PROJECT_ID,
         job_role_id: '00000000-0000-0000-0000-000000000004', // Surveyor
         work_date: dateStr,
-        worker_count: 1,
-        notes: 'Pengukuran elevasi lantai dasar & as kolom',
+        worker_count: isOct11 ? 1 : 1,
+        notes: isOct11 ? 'Surveyor = 1 orang' : 'Pengukuran elevasi lantai dasar & as kolom',
         created_at: `${dateStr}T17:00:00.000Z`,
         updated_at: `${dateStr}T17:00:00.000Z`,
       },
@@ -121,7 +121,7 @@ export function generateDemoRecords(): DailyManpower[] {
         job_role_id: '00000000-0000-0000-0000-000000000005', // Pekerja
         work_date: dateStr,
         worker_count: pekerjaDaily[idx],
-        notes: idx < 2 ? 'Pekerjaan pengecoran & pembersihan lahan (11 org)' : 'Pekerjaan galian & pembesian struktur (8 org)',
+        notes: isOct11 ? 'Pekerja = 0 orang' : (idx < 2 ? 'Pekerjaan pengecoran & pembersihan lahan (11 org)' : 'Pekerjaan galian & pembesian struktur (8 org)'),
         created_at: `${dateStr}T17:00:00.000Z`,
         updated_at: `${dateStr}T17:00:00.000Z`,
       },
@@ -150,8 +150,8 @@ export function generateDemoRecords(): DailyManpower[] {
         project_id: DEMO_PROJECT_ID,
         job_role_id: '00000000-0000-0000-0000-000000000008', // HSE
         work_date: dateStr,
-        worker_count: 2,
-        notes: 'Toolbox meeting & pengawasan APD',
+        worker_count: isOct11 ? 1 : 2,
+        notes: isOct11 ? 'HSE = 1 orang | Cuaca: Jam 08:00 - 17.00 Cerah | Kendala: Material utama belum ada | Saran: Di tambah dudukan alas pijakan, agar pekerja lebih aman; Lakukan mapping pekerjaan' : 'Toolbox meeting & pengawasan APD',
         created_at: `${dateStr}T17:00:00.000Z`,
         updated_at: `${dateStr}T17:00:00.000Z`,
       }
@@ -390,12 +390,13 @@ export class DataService {
       let projects: Project[] = [];
       let roles: JobRole[] = [];
       let manpower: DailyManpower[] = [];
-
+      let reports: DailyReportNarrative[] = [];
       if (!forceReset) {
         try {
           projects = JSON.parse(localStorage.getItem(KEY_PROJECTS) || '[]');
           roles = JSON.parse(localStorage.getItem(KEY_ROLES) || '[]');
           manpower = JSON.parse(localStorage.getItem(KEY_MANPOWER) || '[]');
+          reports = JSON.parse(localStorage.getItem(KEY_DAILY_REPORTS) || '[]');
         } catch {
           // ignore
         }
@@ -418,9 +419,48 @@ export class DataService {
         }
       }
 
+      // Add demo daily report narratives if not present
+      const demoReportsList: DailyReportNarrative[] = [
+        {
+          project_id: DEMO_PROJECT_ID,
+          work_date: '2026-10-11',
+          rencana_m6: '1,755%',
+          realisasi_m6: '3,483%',
+          deviasi_m6: '1,728%',
+          pekerjaan: '-',
+          peralatan: '',
+          kendala: '- material utama belum ada',
+          cuaca: '- Jam 08:00 - 17.00 Cerah',
+          material_masuk: '- saat ini belum ada material masuk',
+          saran: '- Di tambah dudukan alas pijakan, agar pekerja lebih aman\n- lakukan mapping pekerjaan',
+          updated_at: '2026-10-11T17:00:00.000Z',
+        },
+        ...['2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08'].map((d) => ({
+          project_id: DEMO_PROJECT_ID,
+          work_date: d,
+          rencana_m6: '1,500%',
+          realisasi_m6: '1,500%',
+          deviasi_m6: '0,000%',
+          pekerjaan: '- Pekerjaan persiapan, pengukuran, dan galian struktur',
+          peralatan: '- Excavator, Genset',
+          kendala: '- Nihil',
+          cuaca: '- Cerah berawan',
+          material_masuk: '- Besi beton & kayu bekisting',
+          saran: '- Utamakan keselamatan kerja K3',
+          updated_at: `${d}T17:00:00.000Z`,
+        }))
+      ];
+
+      for (const rep of demoReportsList) {
+        if (!reports.some((x) => x.project_id === rep.project_id && x.work_date === rep.work_date)) {
+          reports.push(rep);
+        }
+      }
+
       localStorage.setItem(KEY_PROJECTS, JSON.stringify(projects));
       localStorage.setItem(KEY_ROLES, JSON.stringify(roles));
       localStorage.setItem(KEY_MANPOWER, JSON.stringify(manpower));
+      localStorage.setItem(KEY_DAILY_REPORTS, JSON.stringify(reports));
       localStorage.setItem(KEY_ACTIVE_PROJECT, demoPrj.id);
       localStorage.setItem(KEY_DEMO_LOADED, 'true');
     }
@@ -809,5 +849,42 @@ export class DataService {
    */
   static resetToDemoData() {
     this.initializeLocalData(true);
+  }
+
+  // --- DAILY REPORT NARRATIVES ---
+  static getDailyReportNarrative(projectId: string, workDate: string): DailyReportNarrative | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      const all: DailyReportNarrative[] = JSON.parse(localStorage.getItem(KEY_DAILY_REPORTS) || '[]');
+      return all.find((r) => r.project_id === projectId && r.work_date === workDate) || null;
+    } catch {
+      return null;
+    }
+  }
+
+  static saveDailyReportNarrative(narrative: DailyReportNarrative): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const all: DailyReportNarrative[] = JSON.parse(localStorage.getItem(KEY_DAILY_REPORTS) || '[]');
+      const idx = all.findIndex((r) => r.project_id === narrative.project_id && r.work_date === narrative.work_date);
+      if (idx >= 0) {
+        all[idx] = { ...narrative, updated_at: new Date().toISOString() };
+      } else {
+        all.push({ ...narrative, updated_at: new Date().toISOString() });
+      }
+      localStorage.setItem(KEY_DAILY_REPORTS, JSON.stringify(all));
+    } catch (err) {
+      console.error('Error saving daily report narrative:', err);
+    }
+  }
+
+  static getAllDailyReportNarratives(projectId: string): DailyReportNarrative[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const all: DailyReportNarrative[] = JSON.parse(localStorage.getItem(KEY_DAILY_REPORTS) || '[]');
+      return all.filter((r) => r.project_id === projectId).sort((a, b) => b.work_date.localeCompare(a.work_date));
+    } catch {
+      return [];
+    }
   }
 }

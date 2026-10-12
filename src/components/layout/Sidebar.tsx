@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   ClipboardEdit,
   FileSpreadsheet,
+  FileText,
   Building2,
   Users2,
   Archive,
@@ -19,6 +20,7 @@ import { PWAInstallButton } from '../pwa/PWAInstallButton';
 export type NavigationTab =
   | 'dashboard'
   | 'daily_input'
+  | 'daily_report'
   | 'weekly_report'
   | 'projects'
   | 'job_roles'
@@ -54,6 +56,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Input Tenaga Kerja',
       icon: <ClipboardEdit className="w-5 h-5" />,
       badge: 'Harian',
+    },
+    {
+      id: 'daily_report',
+      label: 'Input Laporan Harian',
+      icon: <FileText className="w-5 h-5" />,
+      badge: 'Resmi',
     },
     {
       id: 'weekly_report',
