@@ -150,4 +150,5 @@ export interface GoogleIntegrationSettings {
   sheetsIncludeSummaryRow: boolean;
   sheetsNumberFormatId: boolean;
   autoOpenSpreadsheetAfterExport: boolean;
+  allowedEmail: string;
 }

@@ -96,6 +96,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     try {
       const res = await googleSignIn();
       if (res) {
+        if (googleSettings.allowedEmail && res.user.email !== googleSettings.allowedEmail) {
+          await googleSignOut();
+          throw new Error(`Akses ditolak. Email ${res.user.email} tidak diizinkan. Gunakan akun ${googleSettings.allowedEmail}.`);
+        }
         setGoogleUser(res.user);
         setShowTroubleshootHelp(false);
         if (addToast) addToast('success', `Berhasil terhubung ke akun Google: ${res.user.email}`);
@@ -110,6 +114,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const handleSimulateGoogleLogin = () => {
     const res = connectSimulatedGoogleAccount();
+    if (googleSettings.allowedEmail && res.user.email !== googleSettings.allowedEmail) {
+        if (addToast) addToast('error', `Akses simulasi ditolak. Gunakan akun ${googleSettings.allowedEmail}.`);
+        return;
+    }
     setGoogleUser(res.user);
     setShowTroubleshootHelp(false);
     if (addToast) addToast('info', 'Mode Pengujian Google Drive & Sheets diaktifkan.');
@@ -1092,6 +1100,23 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Email Restriction Setting */}
+        <div className="px-1 py-3 border-t border-slate-100">
+          <label className="block text-xs font-bold text-slate-700 mb-1.5">
+            Batasi Akses ke Email Akun Google Resmi:
+          </label>
+          <input
+            type="email"
+            value={googleSettings.allowedEmail || ''}
+            onChange={(e) => setGoogleSettings({ ...googleSettings, allowedEmail: e.target.value })}
+            placeholder="contoh: admin@perusahaan.co.id"
+            className="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-200"
+          />
+          <p className="text-[10px] text-slate-500 mt-1">
+            Data Google Drive & Sheets hanya akan terhubung jika email akun yang digunakan cocok dengan email ini. Kosongkan untuk menonaktifkan pembatasan.
+          </p>
         </div>
 
         {/* Buttons: Save & Reset */}

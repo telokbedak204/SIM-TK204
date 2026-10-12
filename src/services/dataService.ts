@@ -22,6 +22,7 @@ export const DEFAULT_GOOGLE_SETTINGS: GoogleIntegrationSettings = {
   sheetsIncludeSummaryRow: true,
   sheetsNumberFormatId: true,
   autoOpenSpreadsheetAfterExport: true,
+  allowedEmail: '',
 };
 
 // Standard RFC4122 UUID matching Supabase seed
