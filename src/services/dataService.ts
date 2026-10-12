@@ -626,16 +626,12 @@ export class DataService {
       recorder_name: project.recorder_name?.trim() || '',
       inspector_name: project.inspector_name?.trim() || '',
       status: project.status || 'active',
-      // Ensure created_by is only sent if it is a valid UUID, otherwise let Supabase handle default
-      created_by: user.id && isValidUUID(user.id) ? user.id : undefined,
       created_at: project.created_at || now,
       updated_at: now,
     };
     
-    // Remove created_by if it's undefined to let Supabase use its default column value (often auth.uid())
-    if (!fullProject.created_by) {
-      delete fullProject.created_by;
-    }
+    // Remove created_by to let Supabase handle it server-side (via RLS/auth.uid())
+    delete fullProject.created_by;
 
     // Save to Supabase if online
     if (isSupabaseConfigured()) {
@@ -650,9 +646,12 @@ export class DataService {
 
         if (existingProject) {
           // Perform update
+          const updatePayload = { ...fullProject };
+          delete updatePayload.created_by;
+          
           const { error } = await client
             .from('projects')
-            .update(fullProject)
+            .update(updatePayload)
             .eq('id', existingProject.id);
           if (error) throw new Error(`Gagal memperbarui ke database Supabase: ${error.message}`);
         } else {
