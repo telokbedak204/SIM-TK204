@@ -422,6 +422,7 @@ export class DataService {
       }
 
       if (roles.length > 0) {
+        // Ensure projects are synced before roles to satisfy FK constraints
         const { error: roleErr } = await client
           .from('job_roles')
           .upsert(roles, { onConflict: 'project_id,name' });
@@ -429,6 +430,7 @@ export class DataService {
       }
 
       if (manpower.length > 0) {
+        // Ensure projects and roles are synced before manpower to satisfy FK constraints
         const { error: mpErr } = await client
           .from('daily_manpower')
           .upsert(manpower, { onConflict: 'project_id,job_role_id,work_date' });
