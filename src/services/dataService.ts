@@ -667,6 +667,20 @@ export class DataService {
     return fullProject;
   }
 
+  static async deleteProject(id: string): Promise<boolean> {
+    if (isSupabaseConfigured()) {
+      const client = getSupabase();
+      if (client) {
+        const { error } = await client.from('projects').delete().eq('id', id);
+        if (error) throw new Error(`Gagal menghapus dari Supabase: ${error.message}`);
+      }
+    }
+    const list = await this.getProjects();
+    const filtered = list.filter((p) => p.id !== id);
+    localStorage.setItem(KEY_PROJECTS, JSON.stringify(filtered));
+    return true;
+  }
+
   static async archiveProject(id: string): Promise<boolean> {
     const prj = await this.getProjectById(id);
     if (!prj) return false;
@@ -1098,6 +1112,22 @@ export class DataService {
   }
 
   // --- GOOGLE INTEGRATION SETTINGS ---
+  static clearAllData(): void {
+    if (typeof window === 'undefined') return;
+    
+    // Clear project data keys
+    localStorage.removeItem(KEY_PROJECTS);
+    localStorage.removeItem(KEY_ROLES);
+    localStorage.removeItem(KEY_MANPOWER);
+    localStorage.removeItem(KEY_DAILY_REPORTS);
+    localStorage.removeItem(KEY_DRIVE_PHOTOS);
+    localStorage.removeItem(KEY_ACTIVE_PROJECT);
+    localStorage.removeItem(KEY_DEMO_LOADED);
+    
+    // Reset to initial state
+    this.initializeLocalData(true);
+  }
+
   static getGoogleSettings(): GoogleIntegrationSettings {
     if (typeof window === 'undefined') return DEFAULT_GOOGLE_SETTINGS;
     try {

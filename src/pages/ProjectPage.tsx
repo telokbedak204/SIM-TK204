@@ -24,6 +24,7 @@ interface ProjectPageProps {
   onSelectProject: (id: string) => void;
   onSaveProject: (data: Partial<Project>) => Promise<boolean>;
   onArchiveProject: (id: string) => Promise<boolean>;
+  onDeleteProject: (id: string) => Promise<boolean>;
   currentUser: UserProfile;
 }
 
@@ -33,6 +34,7 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({
   onSelectProject,
   onSaveProject,
   onArchiveProject,
+  onDeleteProject,
   currentUser,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -66,6 +68,12 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({
     if (!archiveTargetProject) return;
     await onArchiveProject(archiveTargetProject.id);
     setArchiveTargetProject(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTargetProject) return;
+    await onDeleteProject(deleteTargetProject.id);
+    setDeleteTargetProject(null);
   };
 
   const canEdit = currentUser.role === 'admin' || currentUser.role === 'project_manager';
@@ -353,6 +361,36 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({
                 className="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold"
               >
                 Ya, Arsipkan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal Delete */}
+      {deleteTargetProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5 border border-slate-200 animate-in fade-in zoom-in-95">
+            <h3 className="text-base font-bold text-rose-700 flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-rose-600" />
+              Hapus Proyek Secara Permanen?
+            </h3>
+            <p className="text-xs text-slate-600 mt-2">
+              Apakah Anda yakin ingin menghapus proyek <strong>{deleteTargetProject.name}</strong> secara permanen?
+              Aksi ini tidak dapat dibatalkan dan akan menghapus seluruh data terkait.
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setDeleteTargetProject(null)}
+                className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold"
+              >
+                Hapus Permanen
               </button>
             </div>
           </div>

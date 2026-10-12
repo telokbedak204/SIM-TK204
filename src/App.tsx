@@ -215,6 +215,18 @@ export default function App() {
     }
   };
 
+  const handleDeleteProject = async (id: string): Promise<boolean> => {
+    try {
+      await DataService.deleteProject(id);
+      await loadData();
+      addToast('success', 'Proyek berhasil dihapus.');
+      return true;
+    } catch (err) {
+      addToast('error', 'Gagal menghapus proyek: ' + (err as Error).message);
+      return false;
+    }
+  };
+
   const handleSaveJobRole = async (roleData: { id?: string; name: string; sort_order: number; is_active: boolean }): Promise<boolean> => {
     if (!activeProject) return false;
     try {
@@ -391,6 +403,7 @@ export default function App() {
                 onSelectProject={handleSelectProject}
                 onSaveProject={handleSaveProject}
                 onArchiveProject={handleArchiveProject}
+                onDeleteProject={handleDeleteProject}
                 currentUser={currentUser}
               />
             )}
