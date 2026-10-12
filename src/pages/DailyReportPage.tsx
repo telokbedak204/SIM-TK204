@@ -1,8 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { Project, JobRole, DailyManpower, DailyReportNarrative } from '../types';
+import { Project, JobRole, DailyManpower, DailyReportNarrative, DriveDocumentationPhoto } from '../types';
 import { DataService } from '../services/dataService';
 import { formatDateIndo, getDayNameIndo, formatDateIndoFull } from '../lib/calculations';
-import { FileText, Copy, Calendar, Sparkles, CheckCircle2, History, Save, FolderArchive, ArrowRight, Eye, Send } from 'lucide-react';
+import { initGoogleAuth, googleSignIn, getAccessToken } from '../lib/googleDriveAuth';
+import {
+  FileText,
+  Copy,
+  Calendar,
+  CheckCircle2,
+  History,
+  Save,
+  FolderArchive,
+  ArrowRight,
+  Eye,
+  Send,
+  Camera,
+  Image as ImageIcon,
+  Upload,
+  ExternalLink,
+  Trash2,
+  Check,
+  User,
+} from 'lucide-react';
 
 interface DailyReportPageProps {
   project: Project;
@@ -40,6 +59,128 @@ export const DailyReportPage: React.FC<DailyReportPageProps> = ({
   // State for viewing report shape modal when clicking "Buka & Edit"
   const [viewingReportModal, setViewingReportModal] = useState<DailyReportNarrative | null>(null);
   const [modalCopied, setModalCopied] = useState<boolean>(false);
+
+  // Google Drive & Photos State
+  const [googleUser, setGoogleUser] = useState<any>(null);
+  const [needsGoogleAuth, setNeedsGoogleAuth] = useState<boolean>(true);
+  const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
+  const [photos, setPhotos] = useState<DriveDocumentationPhoto[]>([]);
+  const [uploading, setUploading] = useState<boolean>(false);
+  const [captionInput, setCaptionInput] = useState<string>('');
+
+  useEffect(() => {
+    const unsubscribe = initGoogleAuth(
+      (user) => {
+        setGoogleUser(user);
+        setNeedsGoogleAuth(false);
+      },
+      () => {
+        setGoogleUser(null);
+        setNeedsGoogleAuth(true);
+      }
+    );
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!project) return;
+    const loadedPhotos = DataService.getDocumentationPhotos(project.id, selectedDate);
+    setPhotos(loadedPhotos);
+  }, [project, selectedDate]);
+
+  const handleGoogleLogin = async () => {
+    setIsLoggingIn(true);
+    try {
+      const res = await googleSignIn();
+      if (res) {
+        setGoogleUser(res.user);
+        setNeedsGoogleAuth(false);
+        addToast('success', `Berhasil terhubung ke Google Drive (${res.user.email})`, 'Google Drive Terhubung');
+      }
+    } catch (err: any) {
+      addToast('error', 'Gagal menghubungkan Google Drive: ' + err.message);
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const token = await getAccessToken();
+      let driveFileId = undefined;
+      let webViewLink = undefined;
+
+      if (token) {
+        const googleSettings = DataService.getGoogleSettings();
+        const prefix = googleSettings.photoNamingPrefix || 'DOK';
+        const metadata = {
+          name: `${prefix}_${project.code}_${selectedDate}_${file.name}`,
+          mimeType: file.type,
+        };
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', file);
+
+        const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: form,
+        });
+
+        if (uploadRes.ok) {
+          const driveData = await uploadRes.json();
+          driveFileId = driveData.id;
+          const getRes = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=webViewLink,thumbnailLink`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (getRes.ok) {
+            const fileMeta = await getRes.json();
+            webViewLink = fileMeta.webViewLink;
+          }
+        }
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const newPhoto: DriveDocumentationPhoto = {
+          id: `photo-${Date.now()}-${Math.random()}`,
+          project_id: project.id,
+          work_date: selectedDate,
+          file_name: file.name,
+          file_size: file.size,
+          mime_type: file.type,
+          google_drive_file_id: driveFileId,
+          web_view_link: webViewLink,
+          data_url: reader.result as string,
+          caption: captionInput.trim() || 'Dokumentasi Lapangan Proyek',
+          uploaded_at: new Date().toISOString(),
+        };
+        DataService.saveDocumentationPhoto(newPhoto);
+        setPhotos(DataService.getDocumentationPhotos(project.id, selectedDate));
+        setCaptionInput('');
+        setUploading(false);
+        addToast('success', token ? 'Foto berhasil diunggah & disimpan ke Google Drive!' : 'Foto dokumentasi berhasil disimpan!');
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error('Error uploading photo:', err);
+      addToast('error', 'Gagal mengunggah foto: ' + err.message);
+      setUploading(false);
+    }
+  };
+
+  const handleDeletePhoto = (photoId: string) => {
+    if (!window.confirm('Hapus foto dokumentasi ini?')) return;
+    DataService.deleteDocumentationPhoto(photoId);
+    setPhotos(DataService.getDocumentationPhotos(project.id, selectedDate));
+    addToast('info', 'Foto dokumentasi dihapus.');
+  };
 
   // Load saved narrative whenever project or selectedDate changes
   useEffect(() => {
@@ -103,21 +244,6 @@ export const DailyReportPage: React.FC<DailyReportPageProps> = ({
     DataService.saveDailyReportNarrative(narrative);
     setAllSavedReports(DataService.getAllDailyReportNarratives(project.id));
     addToast('success', `Laporan harian tanggal ${formatDateIndo(selectedDate)} berhasil disimpan ke Arsip & LocalStorage!`, 'Penyimpanan Berhasil');
-  };
-
-  // Load default template for Oct 11 2026
-  const handleLoadTemplate = () => {
-    onDateChange('2026-10-11');
-    setRencanaM6('1,755%');
-    setRealisasiM6('3,483%');
-    setDeviasiM6('1,728%');
-    setPekerjaanText('-');
-    setPeralatanText('');
-    setKendalaText('- material utama belum ada');
-    setCuacaText('- Jam 08:00 - 17.00 Cerah');
-    setMaterialMasukText('- saat ini belum ada material masuk');
-    setSaranText('- Di tambah dudukan alas pijakan, agar pekerja lebih aman\n- lakukan mapping pekerjaan');
-    addToast('info', 'Template Laporan Harian 11 Oktober 2026 dimuat.');
   };
 
   // Active roles
@@ -249,15 +375,6 @@ ${consultantName}`;
           >
             <FolderArchive className="w-3.5 h-3.5 text-amber-400" />
             <span>Arsip Semua Laporan ({allSavedReports.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleLoadTemplate}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors border border-white/10"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Muat Template 11 Okt</span>
           </button>
         </div>
       </div>
@@ -396,6 +513,127 @@ ${consultantName}`;
                 <Save className="w-4 h-4 text-amber-400" />
                 <span>Simpan Laporan Tanggal {formatDateIndo(selectedDate)}</span>
               </button>
+            </div>
+          </div>
+
+          {/* Google Drive Photo Documentation Card */}
+          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+                  <ImageIcon className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+                    Dokumentasi Foto Lapangan (Google Drive)
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Unggah foto progres dan simpan otomatis ke Google Drive.
+                  </p>
+                </div>
+              </div>
+
+              {needsGoogleAuth ? (
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={isLoggingIn}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#4285F4] hover:bg-blue-600 text-white text-xs font-bold transition-colors shadow-xs"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{isLoggingIn ? 'Menghubungkan...' : 'Hubungkan Google Drive'}</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-lg border border-emerald-200 text-xs font-semibold">
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="truncate max-w-[140px]">{googleUser?.email || 'Terhubung'}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Keterangan / Caption Foto</label>
+                <input
+                  type="text"
+                  value={captionInput}
+                  onChange={(e) => setCaptionInput(e.target.value)}
+                  placeholder="Cth: Pengecoran lantai 2 area zonasi A"
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-hidden focus:border-[#F28C28]"
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-[#F28C28] bg-slate-50 hover:bg-orange-50/50 transition-colors ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <Camera className="w-5 h-5 text-[#F28C28]" />
+                  <span className="text-xs font-semibold text-slate-700">
+                    {uploading ? 'Mengunggah ke Google Drive...' : 'Pilih Foto & Unggah ke Google Drive'}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    disabled={uploading}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Photos Grid */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Daftar Foto Dokumentasi ({photos.length})
+              </h4>
+              {photos.length === 0 ? (
+                <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 text-xs">
+                  Belum ada foto dokumentasi diunggah untuk tanggal {formatDateIndo(selectedDate)}.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {photos.map((p) => (
+                    <div key={p.id} className="relative group bg-slate-100 rounded-xl overflow-hidden border border-slate-200 shadow-xs flex flex-col">
+                      <div className="h-28 bg-slate-200 overflow-hidden relative">
+                        {p.data_url ? (
+                          <img src={p.data_url} alt={p.file_name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">Foto</div>
+                        )}
+                        <div className="absolute top-1 right-1 flex items-center gap-1 opacity-90 group-hover:opacity-100 transition-opacity">
+                          {p.web_view_link && (
+                            <a
+                              href={p.web_view_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1 bg-blue-600 text-white rounded-md shadow-xs hover:bg-blue-700"
+                              title="Buka di Google Drive"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePhoto(p.id)}
+                            className="p-1 bg-rose-600 text-white rounded-md shadow-xs hover:bg-rose-700"
+                            title="Hapus Foto"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="p-2 bg-white flex-1 flex flex-col justify-between">
+                        <p className="text-[11px] font-semibold text-slate-800 line-clamp-2">{p.caption}</p>
+                        <div className="flex items-center justify-between mt-1 text-[9px] text-slate-400">
+                          <span className="truncate">{p.file_name}</span>
+                          <span className={p.google_drive_file_id ? 'text-blue-600 font-bold' : 'text-slate-500'}>
+                            {p.google_drive_file_id ? 'Drive ☁️' : 'Lokal'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

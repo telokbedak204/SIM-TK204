@@ -100,6 +100,32 @@ export interface MatrixSummary {
   missingDates: string[]; // dates in period with no records
 }
 
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'reminder' | 'warning' | 'info' | 'success';
+  date: string;
+  is_read: boolean;
+  project_id?: string;
+  created_at: string;
+}
+
+export interface DriveDocumentationPhoto {
+  id: string;
+  project_id: string;
+  work_date: string;
+  file_name: string;
+  file_size?: number;
+  mime_type: string;
+  google_drive_file_id?: string;
+  web_view_link?: string;
+  thumbnail_link?: string;
+  data_url?: string;
+  caption?: string;
+  uploaded_at: string;
+}
+
 export interface AppSettings {
   appName: string;
   appSubtitle: string;
@@ -114,4 +140,14 @@ export interface SupabaseConfig {
   url: string;
   publishableKey: string;
   isConnected: boolean;
+}
+
+export interface GoogleIntegrationSettings {
+  driveFolderName: string;
+  autoCompressPhotos: boolean;
+  photoNamingPrefix: string;
+  sheetsIncludeProjectHeader: boolean;
+  sheetsIncludeSummaryRow: boolean;
+  sheetsNumberFormatId: boolean;
+  autoOpenSpreadsheetAfterExport: boolean;
 }

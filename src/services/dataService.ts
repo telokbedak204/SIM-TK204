@@ -1,4 +1,4 @@
-import { Project, JobRole, DailyManpower, UserProfile, UserRole, DailyReportNarrative } from '../types';
+import { Project, JobRole, DailyManpower, UserProfile, UserRole, DailyReportNarrative, AppNotification, DriveDocumentationPhoto, GoogleIntegrationSettings } from '../types';
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase';
 import { generateUUID } from '../lib/uuid';
 
@@ -10,6 +10,19 @@ const KEY_DAILY_REPORTS = 'sim_tk204_daily_reports';
 const KEY_ACTIVE_PROJECT = 'sim_tk204_active_project_id';
 const KEY_CURRENT_USER = 'sim_tk204_current_user';
 const KEY_DEMO_LOADED = 'sim_tk204_demo_loaded';
+const KEY_NOTIFICATIONS = 'sim_tk204_notifications';
+const KEY_DRIVE_PHOTOS = 'sim_tk204_drive_photos';
+const KEY_GOOGLE_SETTINGS = 'sim_tk204_google_settings';
+
+export const DEFAULT_GOOGLE_SETTINGS: GoogleIntegrationSettings = {
+  driveFolderName: 'SIM-TK204_Dokumentasi_Proyek',
+  autoCompressPhotos: true,
+  photoNamingPrefix: 'DOK',
+  sheetsIncludeProjectHeader: true,
+  sheetsIncludeSummaryRow: true,
+  sheetsNumberFormatId: true,
+  autoOpenSpreadsheetAfterExport: true,
+};
 
 // Standard RFC4122 UUID matching Supabase seed
 export const DEMO_PROJECT_ID = '00000000-0000-0000-0000-000000000204';
@@ -184,6 +197,67 @@ export class DataService {
     if (typeof window !== 'undefined') {
       localStorage.setItem(KEY_CURRENT_USER, JSON.stringify(user));
     }
+  }
+
+  static getSystemUsers(): { id: string; name: string; email: string; role: UserRole; company: string; password?: string; is_active: boolean }[] {
+    const KEY_SYSTEM_USERS = 'sim_tk204_system_users';
+    const INITIAL_USERS = [
+      { id: 'usr-1', name: 'Ir. Hendra Wijaya, MT', email: 'hendra.pm@simtk204.id', role: 'admin' as UserRole, company: 'PT. Bahtera Karya Anambas', password: 'adminpassword123', is_active: true },
+      { id: 'usr-2', name: 'Rian Pratama, ST', email: 'rian.site@simtk204.id', role: 'project_manager' as UserRole, company: 'PT. Teknik Eksakta', password: 'password123', is_active: true },
+      { id: 'usr-3', name: 'Ahmad Faisal', email: 'faisal.admin@simtk204.id', role: 'editor' as UserRole, company: 'PT. Teknik Eksakta', password: 'password123', is_active: true },
+      { id: 'usr-4', name: 'Dedi Kurniawan, ST', email: 'dedi.mk@simtk204.id', role: 'viewer' as UserRole, company: 'PT. Arcansia Dwitama Konsultan', password: 'password123', is_active: true },
+    ];
+    if (typeof window === 'undefined') return INITIAL_USERS;
+    try {
+      const raw = localStorage.getItem(KEY_SYSTEM_USERS);
+      return raw ? JSON.parse(raw) : INITIAL_USERS;
+    } catch {
+      return INITIAL_USERS;
+    }
+  }
+
+  static authenticate(identifier: string, password: string): { success: boolean; user?: UserProfile; error?: string } {
+    const users = this.getSystemUsers();
+    const cleanId = identifier.trim().toLowerCase();
+    const cleanPass = password.trim();
+
+    const matched = users.find(
+      (u) => u.email.toLowerCase() === cleanId || u.name.toLowerCase() === cleanId
+    );
+
+    if (!matched) {
+      return { success: false, error: 'Nama user atau email tidak ditemukan. Pastikan email terdaftar.' };
+    }
+
+    if (matched.password && matched.password !== cleanPass) {
+      return { success: false, error: 'Password login salah. Silakan coba lagi atau hubungi Administrator.' };
+    }
+
+    const profile: UserProfile = {
+      id: matched.id,
+      email: matched.email,
+      full_name: matched.name,
+      role: matched.role,
+      company: matched.company,
+    };
+
+    this.setCurrentUser(profile);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sim_tk204_is_logged_in', 'true');
+    }
+    return { success: true, user: profile };
+  }
+
+  static logout() {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sim_tk204_is_logged_in', 'false');
+    }
+  }
+
+  static isLoggedIn(): boolean {
+    if (typeof window === 'undefined') return true;
+    const val = localStorage.getItem('sim_tk204_is_logged_in');
+    return val !== 'false';
   }
 
   static setSimulatedRole(role: UserRole) {
@@ -504,11 +578,10 @@ export class DataService {
     return list.find((p) => p.id === id) || null;
   }
 
-  static async getActiveProject(): Promise<Project> {
+  static async getActiveProject(): Promise<Project | null> {
     const list = await this.getProjects();
     if (list.length === 0) {
-      this.initializeLocalData(true);
-      return INITIAL_DEMO_PROJECT;
+      return null;
     }
 
     const activeId = typeof window !== 'undefined' ? localStorage.getItem(KEY_ACTIVE_PROJECT) : null;
@@ -851,6 +924,16 @@ export class DataService {
     this.initializeLocalData(true);
   }
 
+  static clearAllData() {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(KEY_PROJECTS);
+    localStorage.removeItem(KEY_ROLES);
+    localStorage.removeItem(KEY_MANPOWER);
+    localStorage.removeItem(KEY_DAILY_REPORTS);
+    localStorage.removeItem(KEY_ACTIVE_PROJECT);
+    localStorage.setItem(KEY_DEMO_LOADED, 'true');
+  }
+
   // --- DAILY REPORT NARRATIVES ---
   static getDailyReportNarrative(projectId: string, workDate: string): DailyReportNarrative | null {
     if (typeof window === 'undefined') return null;
@@ -886,5 +969,135 @@ export class DataService {
     } catch {
       return [];
     }
+  }
+
+  // --- NOTIFICATIONS & REMINDERS ---
+  static getNotifications(): AppNotification[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem(KEY_NOTIFICATIONS);
+      if (!stored) {
+        const defaultNotifs: AppNotification[] = [
+          {
+            id: generateUUID(),
+            title: 'Pengingat Laporan Harian',
+            message: 'Jangan lupa untuk melakukan input absensi tenaga kerja dan narasi laporan harian konstruksi hari ini.',
+            type: 'reminder',
+            date: new Date().toISOString().split('T')[0] + ' 08:30',
+            is_read: false,
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: generateUUID(),
+            title: 'Briefing K3 & Keselamatan',
+            message: 'Jadwal rutin Toolbox Meeting / Briefing Keselamatan dan Kesehatan Kerja di lokasi proyek pukul 08:00.',
+            type: 'warning',
+            date: new Date().toISOString().split('T')[0] + ' 08:00',
+            is_read: false,
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: generateUUID(),
+            title: 'Evaluasi Progres M6',
+            message: 'Periksa kesesuaian antara Rencana M6 dan Realisasi M6 serta deviasi pekerjaan.',
+            type: 'info',
+            date: new Date(Date.now() - 86400000).toISOString().split('T')[0] + ' 16:00',
+            is_read: true,
+            created_at: new Date(Date.now() - 86400000).toISOString(),
+          },
+        ];
+        localStorage.setItem(KEY_NOTIFICATIONS, JSON.stringify(defaultNotifs));
+        return defaultNotifs;
+      }
+      return JSON.parse(stored);
+    } catch {
+      return [];
+    }
+  }
+
+  static saveNotifications(notifs: AppNotification[]): void {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(KEY_NOTIFICATIONS, JSON.stringify(notifs));
+  }
+
+  static addNotification(notif: Omit<AppNotification, 'id' | 'created_at' | 'is_read'>): AppNotification {
+    const all = this.getNotifications();
+    const newNotif: AppNotification = {
+      ...notif,
+      id: generateUUID(),
+      is_read: false,
+      created_at: new Date().toISOString(),
+    };
+    all.unshift(newNotif);
+    this.saveNotifications(all);
+    return newNotif;
+  }
+
+  static markNotificationAsRead(id: string): void {
+    const all = this.getNotifications();
+    const updated = all.map((n) => (n.id === id ? { ...n, is_read: true } : n));
+    this.saveNotifications(updated);
+  }
+
+  static markAllNotificationsAsRead(): void {
+    const all = this.getNotifications();
+    const updated = all.map((n) => ({ ...n, is_read: true }));
+    this.saveNotifications(updated);
+  }
+
+  static deleteNotification(id: string): void {
+    const all = this.getNotifications();
+    const filtered = all.filter((n) => n.id !== id);
+    this.saveNotifications(filtered);
+  }
+
+  // --- DRIVE DOCUMENTATION PHOTOS ---
+  static getDocumentationPhotos(projectId: string, workDate: string): DriveDocumentationPhoto[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const all: DriveDocumentationPhoto[] = JSON.parse(localStorage.getItem(KEY_DRIVE_PHOTOS) || '[]');
+      return all.filter((p) => p.project_id === projectId && p.work_date === workDate);
+    } catch {
+      return [];
+    }
+  }
+
+  static saveDocumentationPhoto(photo: DriveDocumentationPhoto): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const all: DriveDocumentationPhoto[] = JSON.parse(localStorage.getItem(KEY_DRIVE_PHOTOS) || '[]');
+      all.unshift(photo);
+      localStorage.setItem(KEY_DRIVE_PHOTOS, JSON.stringify(all));
+    } catch (err) {
+      console.error('Error saving documentation photo:', err);
+    }
+  }
+
+  static deleteDocumentationPhoto(id: string): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const all: DriveDocumentationPhoto[] = JSON.parse(localStorage.getItem(KEY_DRIVE_PHOTOS) || '[]');
+      const filtered = all.filter((p) => p.id !== id);
+      localStorage.setItem(KEY_DRIVE_PHOTOS, JSON.stringify(filtered));
+    } catch (err) {
+      console.error('Error deleting documentation photo:', err);
+    }
+  }
+
+  // --- GOOGLE INTEGRATION SETTINGS ---
+  static getGoogleSettings(): GoogleIntegrationSettings {
+    if (typeof window === 'undefined') return DEFAULT_GOOGLE_SETTINGS;
+    try {
+      const stored = localStorage.getItem(KEY_GOOGLE_SETTINGS);
+      if (!stored) return DEFAULT_GOOGLE_SETTINGS;
+      return { ...DEFAULT_GOOGLE_SETTINGS, ...JSON.parse(stored) };
+    } catch {
+      return DEFAULT_GOOGLE_SETTINGS;
+    }
+  }
+
+  static saveGoogleSettings(settings: GoogleIntegrationSettings): void {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(KEY_GOOGLE_SETTINGS, JSON.stringify(settings));
   }
 }

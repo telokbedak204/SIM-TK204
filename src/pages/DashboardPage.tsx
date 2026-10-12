@@ -31,7 +31,6 @@ interface DashboardPageProps {
   onNavigateToReport: () => void;
   onExportExcel: () => void;
   onExportPDF: () => void;
-  onLoadDemo: () => void;
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
@@ -48,7 +47,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   onNavigateToReport,
   onExportExcel,
   onExportPDF,
-  onLoadDemo,
 }) => {
   return (
     <div className="space-y-6">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Project, JobRole, DailyManpower, UserProfile, UserRole } from './types';
+import { Project, JobRole, DailyManpower, UserProfile, UserRole, AppNotification } from './types';
 import { DataService, DEMO_PROJECT_ID } from './services/dataService';
 import { computeWeeklyMatrix } from './lib/calculations';
 import { isSupabaseConfigured } from './lib/supabase';
@@ -13,6 +13,8 @@ import { BottomNav } from './components/layout/BottomNav';
 import { ToastContainer, ToastMessage } from './components/ui/Notification';
 import { ShareAppModal } from './components/pwa/ShareAppModal';
 import { OfflineIndicator } from './components/pwa/OfflineIndicator';
+import { NotificationModal } from './components/modals/NotificationModal';
+import { LoginModal } from './components/auth/LoginModal';
 
 // Pages
 import { DashboardPage } from './pages/DashboardPage';
@@ -23,6 +25,7 @@ import { ProjectPage } from './pages/ProjectPage';
 import { JobRolesPage } from './pages/JobRolesPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { UserRolesPage } from './pages/UserRolesPage';
 import { AboutPage } from './pages/AboutPage';
 
 export default function App() {
@@ -40,9 +43,17 @@ export default function App() {
   const [endDateStr, setEndDateStr] = useState<string>('2026-10-08');
   const [selectedDailyDate, setSelectedDailyDate] = useState<string>('2026-10-02');
 
+  // Authentication & Session
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    return DataService.isLoggedIn();
+  });
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+
   // Notifications & Modals
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState<boolean>(false);
 
   const addToast = useCallback((type: 'success' | 'warning' | 'error' | 'info', message: string, title?: string) => {
     const id = `toast-${Date.now()}-${Math.random()}`;
@@ -54,6 +65,33 @@ export default function App() {
 
   const dismissToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const unreadNotificationCount = useMemo(() => {
+    return notifications.filter((n) => !n.is_read).length;
+  }, [notifications]);
+
+  const handleMarkAsRead = (id: string) => {
+    DataService.markNotificationAsRead(id);
+    setNotifications(DataService.getNotifications());
+  };
+
+  const handleMarkAllAsRead = () => {
+    DataService.markAllNotificationsAsRead();
+    setNotifications(DataService.getNotifications());
+    addToast('success', 'Semua notifikasi ditandai telah dibaca.');
+  };
+
+  const handleDeleteNotification = (id: string) => {
+    DataService.deleteNotification(id);
+    setNotifications(DataService.getNotifications());
+    addToast('info', 'Notifikasi dihapus.');
+  };
+
+  const handleAddNotification = (notif: Omit<AppNotification, 'id' | 'created_at' | 'is_read'>) => {
+    DataService.addNotification(notif);
+    setNotifications(DataService.getNotifications());
+    addToast('success', 'Pengingat berhasil dibuat.');
   };
 
   // Load all data
@@ -73,6 +111,9 @@ export default function App() {
         const records = await DataService.getDailyManpower(active.id);
         setDailyRecords(records);
       }
+
+      const notifs = DataService.getNotifications();
+      setNotifications(notifs);
     } catch (err) {
       console.error('Error loading data:', err);
       addToast('error', 'Gagal memuat data: ' + (err as Error).message);
@@ -108,6 +149,19 @@ export default function App() {
     setCurrentUser(updated);
     addToast('info', `Peran pengguna disimulasikan sebagai: ${newRole.toUpperCase()}`);
   };
+
+  const handleLogout = useCallback(() => {
+    DataService.logout();
+    setIsLoggedIn(false);
+    setIsSidebarOpen(false);
+    addToast('info', 'Anda telah keluar dari aplikasi.');
+  }, [addToast]);
+
+  const handleLoginSuccess = useCallback((user: UserProfile) => {
+    setCurrentUser(user);
+    setIsLoggedIn(true);
+    setIsLoginModalOpen(false);
+  }, []);
 
   const handleDateRangeChange = (start: string, end: string) => {
     if (end < start) {
@@ -227,14 +281,19 @@ export default function App() {
     }
   };
 
-  const handleResetDemo = () => {
-    DataService.resetToDemoData();
-    loadData();
-    setStartDateStr('2026-10-02');
-    setEndDateStr('2026-10-08');
-    setSelectedDailyDate('2026-10-02');
-    addToast('success', 'Data standar demo Pasar Loka (97 OH, 13,86 Org/Hari) berhasil dimuat ulang!');
-  };
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-3 sm:p-4">
+        <LoginModal
+          isOpen={true}
+          isFullPage={true}
+          onLoginSuccess={handleLoginSuccess}
+          addToast={addToast}
+        />
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans w-full max-w-full overflow-x-hidden">
@@ -249,6 +308,10 @@ export default function App() {
         onRoleChange={handleRoleChange}
         onOpenSettings={() => setCurrentTab('settings')}
         onOpenShare={() => setIsShareModalOpen(true)}
+        unreadNotificationCount={unreadNotificationCount}
+        onOpenNotifications={() => setIsNotificationModalOpen(true)}
+        onLogout={handleLogout}
+        onOpenLogin={() => setIsLoginModalOpen(true)}
       />
 
       {/* Main Container with Sidebar */}
@@ -259,8 +322,9 @@ export default function App() {
           onSelectTab={(tab) => setCurrentTab(tab)}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
-          onLoadDemo={handleResetDemo}
           onOpenShare={() => setIsShareModalOpen(true)}
+          onLogout={handleLogout}
+          onOpenLogin={() => setIsLoginModalOpen(true)}
         />
 
         {/* Content Area */}
@@ -282,7 +346,6 @@ export default function App() {
                 onNavigateToReport={() => setCurrentTab('weekly_report')}
                 onExportExcel={() => handleExportExcel()}
                 onExportPDF={() => handleExportPDF()}
-                onLoadDemo={handleResetDemo}
               />
             )}
 
@@ -357,10 +420,43 @@ export default function App() {
               />
             )}
 
+            {!activeProject && ['dashboard', 'daily_input', 'daily_report', 'weekly_report', 'job_roles', 'history'].includes(currentTab) && (
+              <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center max-w-lg mx-auto my-12 shadow-sm space-y-4">
+                <div className="w-16 h-16 bg-orange-50 text-[#F28C28] rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold">
+                  📁
+                </div>
+                <h3 className="text-lg font-bold text-slate-800">Belum Ada Proyek Aktif / Data Kosong</h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Seluruh data telah dikosongkan. Silakan buat proyek baru atau pilih proyek untuk mulai memasukkan data harian dan laporan konstruksi Anda.
+                </p>
+                <button
+                  onClick={() => setCurrentTab('projects')}
+                  className="px-5 py-2.5 rounded-xl bg-[#F28C28] hover:bg-orange-600 text-white text-xs font-bold shadow-md transition-colors"
+                >
+                  Kelola / Buat Proyek Baru
+                </button>
+              </div>
+            )}
+
+            {currentTab === 'user_roles' && (
+              <UserRolesPage
+                currentUser={currentUser}
+                onRoleChange={handleRoleChange}
+                addToast={addToast}
+                onUpdateCurrentUser={(updated) => {
+                  DataService.setCurrentUser(updated);
+                  setCurrentUser(updated);
+                }}
+                onLogout={handleLogout}
+                onOpenLogin={() => setIsLoginModalOpen(true)}
+              />
+            )}
+
             {currentTab === 'settings' && (
               <SettingsPage
-                onResetDemo={handleResetDemo}
                 onRefreshData={loadData}
+                onNavigateToProjects={() => setCurrentTab('projects')}
+                addToast={addToast}
               />
             )}
 
@@ -381,8 +477,29 @@ export default function App() {
         onShowToast={(type, msg) => addToast(type, msg)}
       />
 
+      {/* Notification & Reminder Center Modal */}
+      <NotificationModal
+        isOpen={isNotificationModalOpen}
+        onClose={() => setIsNotificationModalOpen(false)}
+        notifications={notifications}
+        onMarkAsRead={handleMarkAsRead}
+        onMarkAllAsRead={handleMarkAllAsRead}
+        onDeleteNotification={handleDeleteNotification}
+        onAddNotification={handleAddNotification}
+        addToast={addToast}
+      />
+
       {/* Offline Connectivity Status Toast */}
       <OfflineIndicator />
+
+      {/* Modal Masuk / Ganti Akun */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        isFullPage={false}
+        onClose={() => setIsLoginModalOpen(false)}
+        onLoginSuccess={handleLoginSuccess}
+        addToast={addToast}
+      />
 
       {/* Mobile Bottom Navigation Bar (Phone Screens) */}
       <BottomNav

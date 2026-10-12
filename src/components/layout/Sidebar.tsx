@@ -12,8 +12,10 @@ import {
   X,
   HardHat,
   ChevronRight,
-  Sparkles,
   Share2,
+  ShieldCheck,
+  LogOut,
+  LogIn,
 } from 'lucide-react';
 import { PWAInstallButton } from '../pwa/PWAInstallButton';
 
@@ -25,6 +27,7 @@ export type NavigationTab =
   | 'projects'
   | 'job_roles'
   | 'history'
+  | 'user_roles'
   | 'settings'
   | 'about';
 
@@ -33,8 +36,9 @@ interface SidebarProps {
   onSelectTab: (tab: NavigationTab) => void;
   isOpen: boolean;
   onClose: () => void;
-  onLoadDemo: () => void;
   onOpenShare?: () => void;
+  onLogout?: () => void;
+  onOpenLogin?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -42,8 +46,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTab,
   isOpen,
   onClose,
-  onLoadDemo,
   onOpenShare,
+  onLogout,
+  onOpenLogin,
 }) => {
   const menuItems: { id: NavigationTab; label: string; icon: React.ReactNode; badge?: string }[] = [
     {
@@ -84,8 +89,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: <Archive className="w-5 h-5" />,
     },
     {
+      id: 'user_roles',
+      label: 'Pengaturan Role Pengguna',
+      icon: <ShieldCheck className="w-5 h-5" />,
+    },
+    {
       id: 'settings',
-      label: 'Pengaturan & Supabase',
+      label: 'Pengaturan Database',
       icon: <Settings className="w-5 h-5" />,
     },
     {
@@ -246,26 +256,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="text-[10px] text-slate-400">Share</span>
             </button>
           )}
-        </div>
 
-        {/* Quick Demo Data Reset Card */}
-        <div className="p-3.5 m-3 rounded-xl bg-slate-800/70 border border-slate-700/80">
-          <div className="flex items-center gap-2 text-xs font-semibold text-orange-300 mb-1">
-            <Sparkles className="w-3.5 h-3.5 text-[#F28C28]" />
-            <span>Data Uji Pasar Loka</span>
-          </div>
-          <p className="text-[11px] text-slate-300 leading-relaxed mb-2.5">
-            Muat ulang data standar demo 2–8 Okt 2026 (97 OH, 13,86 Org/Hari).
-          </p>
-          <button
-            onClick={() => {
-              onLoadDemo();
-              if (window.innerWidth < 1024) onClose();
-            }}
-            className="w-full text-center text-xs font-semibold py-1.5 px-2 rounded-lg bg-orange-600/30 hover:bg-orange-600/50 text-orange-200 border border-orange-500/40 transition-colors"
-          >
-            Muat Data Standar Demo
-          </button>
+          {/* Masuk / Ganti Akun */}
+          {onOpenLogin && (
+            <button
+              onClick={() => {
+                onOpenLogin();
+                if (window.innerWidth < 1024) onClose();
+              }}
+              className="w-full flex items-center justify-between px-3.5 py-2 rounded-lg text-xs font-semibold bg-blue-950/40 hover:bg-blue-900/50 text-blue-300 border border-blue-800/60 transition-colors min-h-[40px]"
+            >
+              <div className="flex items-center gap-2.5">
+                <LogIn className="w-4 h-4 text-blue-400" />
+                <span>Masuk / Ganti Akun</span>
+              </div>
+              <span className="text-[10px] text-blue-400 font-mono">Login</span>
+            </button>
+          )}
+
+          {/* Keluar dari Aplikasi */}
+          {onLogout && (
+            <button
+              onClick={() => {
+                if (window.innerWidth < 1024) onClose();
+                onLogout();
+              }}
+              className="w-full flex items-center justify-between px-3.5 py-2 rounded-lg text-xs font-bold bg-rose-950/40 hover:bg-rose-900/50 text-rose-300 border border-rose-800/60 transition-colors min-h-[40px]"
+            >
+              <div className="flex items-center gap-2.5">
+                <LogOut className="w-4 h-4 text-rose-400" />
+                <span>Keluar dari Aplikasi</span>
+              </div>
+              <span className="text-[10px] text-rose-400 font-mono">Logout</span>
+            </button>
+          )}
         </div>
 
         {/* Footer info */}

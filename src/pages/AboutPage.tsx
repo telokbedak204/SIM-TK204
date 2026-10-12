@@ -12,6 +12,8 @@ import {
   Share2,
   Wifi,
   Zap,
+  Folder,
+  Cloud,
 } from 'lucide-react';
 import { PWAInstallButton } from '../components/pwa/PWAInstallButton';
 
@@ -213,6 +215,28 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onOpenShare }) => {
             Menghasilkan dokumen PDF profesional dengan kop identitas proyek, tabel matriks monitoring lengkap dengan border kisi, indikator statistik, serta 3 kolom lembar tanda tangan pengesahan (Kontraktor Pelaksana, Konsultan MK, dan Project Manager).
           </p>
         </div>
+
+        {/* Card 5: Integrasi Google Drive API */}
+        <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs space-y-2">
+          <div className="flex items-center gap-2 text-[#142B4A] font-bold text-sm">
+            <Folder className="w-5 h-5 text-amber-500" />
+            <span>Penyimpanan Foto Google Drive (API v3)</span>
+          </div>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Penyimpanan foto dokumentasi harian pekerjaan langsung dialihkan ke Google Drive pengguna melalui Google Drive REST API v3 dengan kompresi gambar otomatis di sisi klien untuk menghemat kuota internet lapangan.
+          </p>
+        </div>
+
+        {/* Card 6: Integrasi Google Sheets API */}
+        <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs space-y-2">
+          <div className="flex items-center gap-2 text-[#142B4A] font-bold text-sm">
+            <Cloud className="w-5 h-5 text-emerald-600" />
+            <span>Sinkronisasi Cloud Google Sheets (API v4)</span>
+          </div>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Sinkronisasi dan ekspor matriks rekapitulasi mingguan tenaga kerja langsung ke lembar kerja Google Sheets secara otomatis untuk kolaborasi daring instan dengan Konsultan MK dan pemberi kerja tanpa file manual.
+          </p>
+        </div>
       </div>
 
       {/* Technical Stack Specifications */}
@@ -221,7 +245,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onOpenShare }) => {
           <Code2 className="w-4 h-4 text-[#F28C28]" />
           <span>Arsitektur & Komponen Teknologi:</span>
         </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
           <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
             <div className="font-bold text-slate-800">React + TypeScript</div>
             <div className="text-[11px] text-slate-500">Frontend Modular & Type-Safe</div>
@@ -233,6 +257,14 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onOpenShare }) => {
           <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
             <div className="font-bold text-slate-800">Supabase PostgreSQL</div>
             <div className="text-[11px] text-slate-500">Database Cloud & Auth RLS</div>
+          </div>
+          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+            <div className="font-bold text-slate-800">Google Drive API v3</div>
+            <div className="text-[11px] text-slate-500">Cloud Media Storage Lapangan</div>
+          </div>
+          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+            <div className="font-bold text-slate-800">Google Sheets API v4</div>
+            <div className="text-[11px] text-slate-500">Ekspor Cloud Spreadsheet</div>
           </div>
           <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
             <div className="font-bold text-slate-800">SheetJS & jsPDF</div>

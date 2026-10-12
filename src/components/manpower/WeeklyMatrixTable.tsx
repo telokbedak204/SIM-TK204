@@ -7,9 +7,12 @@ import {
   Calendar,
   Layers,
   Sparkles,
+  Cloud,
 } from 'lucide-react';
 import { MatrixSummary, Project } from '../../types';
 import { formatDateIndo, getDayNameIndo, formatDecimalIndo } from '../../lib/calculations';
+import { getAccessToken, googleSignIn } from '../../lib/googleDriveAuth';
+import { DataService } from '../../services/dataService';
 
 interface WeeklyMatrixTableProps {
   summary: MatrixSummary;
@@ -31,6 +34,130 @@ export const WeeklyMatrixTable: React.FC<WeeklyMatrixTableProps> = ({
   onDateClick,
 }) => {
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [isExportingSheets, setIsExportingSheets] = useState(false);
+
+  const handleExportGoogleSheets = async () => {
+    setIsExportingSheets(true);
+    try {
+      let token = await getAccessToken();
+      if (!token) {
+        const res = await googleSignIn();
+        if (!res) {
+          setIsExportingSheets(false);
+          return;
+        }
+        token = res.accessToken;
+      }
+
+      if (!token) {
+        throw new Error('Akses token Google Drive tidak tersedia.');
+      }
+
+      // 1. Create Google Spreadsheet
+      const createRes = await fetch('https://sheets.googleapis.com/spreadsheets', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          properties: {
+            title: `Laporan Mingguan Tenaga Kerja - ${project.name} (${startDateStr} s.d ${endDateStr})`,
+          },
+        }),
+      });
+
+      const responseText = await createRes.text();
+      let sheetData: any;
+      try {
+        sheetData = JSON.parse(responseText);
+      } catch (e) {
+        if (responseText.trim().startsWith('<') || responseText.includes('<!DOCTYPE')) {
+          throw new Error('Autentikasi Google Drive/Sheets memerlukan izin. Silakan login ulang dengan akun Google Anda.');
+        }
+        throw new Error('Respon server Google tidak valid: ' + responseText.substring(0, 100));
+      }
+
+      if (!createRes.ok) {
+        throw new Error(sheetData.error?.message || `Gagal membuat Google Spreadsheet (Status: ${createRes.status})`);
+      }
+
+      const spreadsheetId = sheetData.spreadsheetId;
+      const spreadsheetUrl = sheetData.spreadsheetUrl;
+
+      // 2. Prepare values according to user settings
+      const googleSettings = DataService.getGoogleSettings();
+      const headerDates = summary.dates.map((d) => formatDateIndo(d));
+      const headerRow = ['Jabatan / Keahlian', ...headerDates, 'Total OH', 'Rata-rata/Hari'];
+
+      const rows = summary.rows.map((row) => [
+        row.roleName,
+        ...summary.dates.map((d) => row.countsByDate[d] || 0),
+        row.totalManDays,
+        googleSettings.sheetsNumberFormatId ? formatDecimalIndo(row.averagePerDay) : row.averagePerDay,
+      ]);
+
+      const totalRow = [
+        'TOTAL HARIAN',
+        ...summary.dates.map((d) => summary.dailyTotals[d] || 0),
+        summary.grandTotalManDays,
+        googleSettings.sheetsNumberFormatId ? formatDecimalIndo(summary.grandAveragePerDay) : summary.grandAveragePerDay,
+      ];
+
+      const values: any[][] = [];
+      if (googleSettings.sheetsIncludeProjectHeader) {
+        values.push([project.name]);
+        values.push([`Periode Laporan: ${formatDateIndo(startDateStr)} s.d ${formatDateIndo(endDateStr)}`]);
+        values.push([]);
+      }
+      values.push(headerRow);
+      values.push(...rows);
+      if (googleSettings.sheetsIncludeSummaryRow) {
+        values.push([]);
+        values.push(totalRow);
+      }
+
+      // 3. Update spreadsheet values
+      const updateRes = await fetch(
+        `https://sheets.googleapis.com/spreadsheets/${spreadsheetId}/values/Sheet1!A1?valueInputOption=USER_ENTERED`,
+        {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            values,
+          }),
+        }
+      );
+
+      const updateText = await updateRes.text();
+      let updateJson: any;
+      try {
+        updateJson = JSON.parse(updateText);
+      } catch (e) {
+        if (updateText.trim().startsWith('<') || updateText.includes('<!DOCTYPE')) {
+          throw new Error('Sesi Google Sheets kedaluwarsa atau akses ditolak.');
+        }
+        throw new Error('Respon update Google Sheets tidak valid.');
+      }
+
+      if (!updateRes.ok) {
+        throw new Error(updateJson.error?.message || 'Gagal mengisi data ke Google Spreadsheet.');
+      }
+
+      if (googleSettings.autoOpenSpreadsheetAfterExport) {
+        window.open(spreadsheetUrl, '_blank');
+      }
+      alert(`Berhasil mengekspor ke Google Sheets!\n\nURL Dokumen:\n${spreadsheetUrl}`);
+    } catch (err: any) {
+      console.error('Google Sheets export error:', err);
+      alert('Gagal ekspor ke Google Sheets: ' + err.message);
+    } finally {
+      setIsExportingSheets(false);
+    }
+  };
 
   return (
     <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden">
@@ -98,6 +225,17 @@ export const WeeklyMatrixTable: React.FC<WeeklyMatrixTableProps> = ({
           >
             <FileText className="w-4 h-4" />
             <span>Cetak PDF</span>
+          </button>
+
+          {/* Export Google Sheets Button */}
+          <button
+            onClick={handleExportGoogleSheets}
+            disabled={isExportingSheets}
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-semibold shadow-xs transition-colors min-h-[44px]"
+            title="Ekspor laporan mingguan langsung ke Google Sheets"
+          >
+            <Cloud className="w-4 h-4 text-amber-300" />
+            <span>{isExportingSheets ? 'Mengirim...' : 'Google Sheets'}</span>
           </button>
         </div>
       </div>
