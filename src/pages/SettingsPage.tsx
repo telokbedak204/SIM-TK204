@@ -665,19 +665,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   type="button"
                   onClick={handleGoogleLogin}
                   disabled={isGoogleLoading}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#4285F4] hover:bg-blue-600 text-white text-xs font-bold transition-colors shadow-xs min-h-[40px]"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#4285F4] hover:bg-blue-600 text-white text-xs font-bold transition-colors shadow-xs min-h-[40px] w-full justify-center"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   <span>{isGoogleLoading ? 'Menghubungkan...' : 'Hubungkan Akun Google'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSimulateGoogleLogin}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors min-h-[40px]"
-                  title="Gunakan mode pengujian jika pop-up Google diblokir oleh peramban"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Mode Simulasi</span>
                 </button>
               </div>
             )}
