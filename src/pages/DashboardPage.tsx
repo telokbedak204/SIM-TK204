@@ -134,12 +134,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             </div>
 
             {/* Quick 7 days demo button */}
-            <button
-              onClick={() => onDateRangeChange('2026-10-02', '2026-10-08')}
-              className="xs:col-span-2 sm:col-span-1 px-4 py-2 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-200 border border-orange-500/40 font-semibold transition-colors min-h-[44px] flex items-center justify-center text-center"
-            >
-              Periode Demo (2–8 Okt)
-            </button>
+            {/* Hapus atau komentari tombol Periode Demo */}
           </div>
         </div>
       </div>
