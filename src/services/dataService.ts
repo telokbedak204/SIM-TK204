@@ -181,17 +181,16 @@ export function generateDemoRecords(): DailyManpower[] {
 // ==========================================
 export class DataService {
   // Current user state
-  static getCurrentUser(): UserProfile {
-    if (typeof window === 'undefined') return DEFAULT_USER;
+  static getCurrentUser(): UserProfile | null {
+    if (typeof window === 'undefined') return null;
     const raw = localStorage.getItem(KEY_CURRENT_USER);
     if (!raw) {
-      localStorage.setItem(KEY_CURRENT_USER, JSON.stringify(DEFAULT_USER));
-      return DEFAULT_USER;
+      return null;
     }
     try {
       return JSON.parse(raw);
     } catch {
-      return DEFAULT_USER;
+      return null;
     }
   }
 

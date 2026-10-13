@@ -35,7 +35,7 @@ export default function App() {
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
   const [dailyRecords, setDailyRecords] = useState<DailyManpower[]>([]);
-  const [currentUser, setCurrentUser] = useState<UserProfile>(DataService.getCurrentUser());
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(DataService.getCurrentUser());
   const [isSupabaseOnline, setIsSupabaseOnline] = useState<boolean>(false);
 
   // Period Filters: Default to Demo Period (2026-10-02 to 2026-10-08)
@@ -44,8 +44,8 @@ export default function App() {
   const [selectedDailyDate, setSelectedDailyDate] = useState<string>('2026-10-02');
 
   // Authentication & Session
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(true);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(!!DataService.isLoggedIn());
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(!DataService.isLoggedIn());
 
   // Notifications & Modals
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
