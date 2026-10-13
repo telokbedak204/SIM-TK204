@@ -213,7 +213,16 @@ export class DataService {
     if (typeof window === 'undefined') return INITIAL_USERS;
     try {
       const raw = localStorage.getItem(KEY_SYSTEM_USERS);
-      return raw ? JSON.parse(raw) : INITIAL_USERS;
+      const storedUsers = raw ? JSON.parse(raw) : [];
+      
+      // Merge INITIAL_USERS into storedUsers by id
+      const merged = [...storedUsers];
+      INITIAL_USERS.forEach(user => {
+        if (!merged.find(u => u.id === user.id)) {
+          merged.push(user);
+        }
+      });
+      return merged;
     } catch {
       return INITIAL_USERS;
     }
@@ -229,11 +238,11 @@ export class DataService {
     );
 
     if (!matched) {
-      return { success: false, error: 'Nama user atau email tidak ditemukan. Pastikan email terdaftar.' };
+      return { success: false, error: 'Nama user atau email tidak ditemukan.' };
     }
 
-    if (matched.password && matched.password !== cleanPass) {
-      return { success: false, error: 'Password login salah. Silakan coba lagi atau hubungi Administrator.' };
+    if (!matched.password || matched.password !== cleanPass) {
+      return { success: false, error: 'Password salah.' };
     }
 
     const profile: UserProfile = {
