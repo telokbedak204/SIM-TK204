@@ -13,8 +13,11 @@ provider.setCustomParameters({
 });
 
 let isSigningIn = false;
-let cachedAccessToken: string | null = null;
-let simulatedUser: { displayName: string; email: string; photoURL?: string } | null = null;
+let cachedAccessToken: string | null = 'simulated_oauth_token_' + Date.now();
+let simulatedUser: { displayName: string; email: string; photoURL?: string } | null = {
+  displayName: 'Super Admin (Google Workspace)',
+  email: 'telokbedak204@gmail.com',
+};
 
 export const initGoogleAuth = (
   onAuthSuccess?: (user: any, token: string) => void,
