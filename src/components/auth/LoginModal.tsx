@@ -170,7 +170,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 type="text"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="hendra.pm@simtk204.id"
                 className="w-full text-xs sm:text-sm pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 font-mono focus:outline-hidden focus:border-[#F28C28] focus:ring-2 focus:ring-orange-200 min-h-[42px]"
                 required
                 autoFocus
@@ -188,7 +187,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Masukkan kata sandi..."
                 className="w-full text-xs sm:text-sm pl-9 pr-10 py-2.5 rounded-xl border border-slate-300 font-mono focus:outline-hidden focus:border-[#F28C28] focus:ring-2 focus:ring-orange-200 min-h-[42px]"
                 required
               />
