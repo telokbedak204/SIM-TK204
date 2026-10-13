@@ -43,6 +43,13 @@ interface SidebarProps {
   currentUserRole: UserRole;
 }
 
+interface MenuItem {
+  id: NavigationTab;
+  label: string;
+  icon: React.ReactNode;
+  badge?: string;
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({
   currentTab,
   onSelectTab,
@@ -53,7 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenLogin,
   currentUserRole,
 }) => {
-  const menuItems: { id: NavigationTab; label: string; icon: React.ReactNode; badge?: string }[] = [
+  const allMenuItems: MenuItem[] = [
     {
       id: 'dashboard',
       label: 'Dashboard Monitoring',
@@ -106,7 +113,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Tentang Aplikasi',
       icon: <Info className="w-5 h-5" />,
     },
-  ].filter(item => {
+  ];
+
+  const menuItems = allMenuItems.filter(item => {
     if (currentUserRole !== 'admin' && (item.id === 'user_roles' || item.id === 'settings')) {
       return false;
     }
@@ -249,38 +258,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="px-3 pt-2 space-y-2">
           <PWAInstallButton variant="sidebar" />
 
-          {onOpenShare && (
-            <button
-              onClick={() => {
-                onOpenShare();
-                if (window.innerWidth < 1024) onClose();
-              }}
-              className="w-full flex items-center justify-between px-3.5 py-2 rounded-lg text-xs font-semibold bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 border border-slate-700 transition-colors min-h-[40px]"
-            >
-              <div className="flex items-center gap-2.5">
-                <Share2 className="w-4 h-4 text-[#F28C28]" />
-                <span>Bagikan Link Aplikasi</span>
-              </div>
-              <span className="text-[10px] text-slate-400">Share</span>
-            </button>
-          )}
-
-          {/* Masuk / Ganti Akun */}
-          {onOpenLogin && (
-            <button
-              onClick={() => {
-                onOpenLogin();
-                if (window.innerWidth < 1024) onClose();
-              }}
-              className="w-full flex items-center justify-between px-3.5 py-2 rounded-lg text-xs font-semibold bg-blue-950/40 hover:bg-blue-900/50 text-blue-300 border border-blue-800/60 transition-colors min-h-[40px]"
-            >
-              <div className="flex items-center gap-2.5">
-                <LogIn className="w-4 h-4 text-blue-400" />
-                <span>Masuk / Ganti Akun</span>
-              </div>
-              <span className="text-[10px] text-blue-400 font-mono">Login</span>
-            </button>
-          )}
 
           {/* Keluar dari Aplikasi */}
           {onLogout && (

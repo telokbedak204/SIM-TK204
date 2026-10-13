@@ -41,11 +41,12 @@ import {
 } from '../lib/supabase';
 import { SIM_TK204_SQL_MIGRATION, SIM_TK204_RLS_FIX_SQL } from '../lib/sqlMigration';
 import { DataService, DEFAULT_GOOGLE_SETTINGS } from '../services/dataService';
-import { UserRole, GoogleIntegrationSettings } from '../types';
+import { UserProfile, UserRole, GoogleIntegrationSettings } from '../types';
 import { initGoogleAuth, googleSignIn, googleSignOut, getAccessToken, connectSimulatedGoogleAccount } from '../lib/googleDriveAuth';
 import { User } from 'firebase/auth';
 
 interface SettingsPageProps {
+  currentUser: UserProfile;
   onRefreshData: () => void;
   onNavigateToProjects?: () => void;
   onNavigateToUserRoles?: () => void;
@@ -53,11 +54,13 @@ interface SettingsPageProps {
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
+  currentUser,
   onRefreshData,
   onNavigateToProjects,
   onNavigateToUserRoles,
   addToast,
 }) => {
+  const isAdmin = currentUser.role === 'admin';
   const currentConfig = getStoredSupabaseConfig();
   const [supabaseUrl, setSupabaseUrl] = useState(currentConfig.url);
   const [supabaseKey, setSupabaseKey] = useState(currentConfig.key);
@@ -65,8 +68,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [testResult, setTestResult] = useState<DetailedConnectionTest | null>(null);
   const [copiedSql, setCopiedSql] = useState(false);
   const [copiedRlsSql, setCopiedRlsSql] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<{ success: boolean; message: string } | null>(null);
 
   // Google Drive & Sheets Integration State
   const [googleUser, setGoogleUser] = useState<any>(null);
@@ -358,17 +359,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setTimeout(() => setCopiedRlsSql(false), 2500);
   };
 
-  const handleSyncToSupabase = async () => {
-    setIsSyncing(true);
-    setSyncStatus(null);
-    const res = await DataService.pushLocalDataToSupabase();
-    setIsSyncing(false);
-    setSyncStatus(res);
-    if (res.success) {
-      onRefreshData();
-    }
-  };
-
   const handleSupabaseAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsAuthLoading(true);
@@ -396,7 +386,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   const isConfigured = Boolean(supabaseUrl && supabaseKey);
-  const currentUser = DataService.getCurrentUser();
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto w-full min-w-0">
@@ -414,6 +403,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       </div>
 
       {/* 1. Supabase Connection Card */}
+      {isAdmin ? (
       <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
           <div className="flex items-center gap-2.5">
@@ -556,44 +546,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           )}
         </div>
       </div>
-
-      {/* 3. Manajemen Pengguna & Sesi */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
-        <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
-          <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-            <UserCheck className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="font-bold text-slate-800 text-sm sm:text-base">
-              Manajemen Pengguna & Sesi
-            </h3>
-            <p className="text-xs text-slate-500">
-              Kelola akun pengguna, hak akses, dan sesi masuk aplikasi
-            </p>
+      ) : (
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs flex items-center gap-4 text-slate-500">
+          <Lock className="w-8 h-8 text-slate-400" />
+          <div className="text-sm">
+            <p className="font-bold text-slate-700">Konfigurasi Database Terkunci</p>
+            <p>Bagian ini hanya dapat diakses oleh Administrator Sistem.</p>
           </div>
         </div>
+      )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-          <button
-            onClick={onNavigateToUserRoles}
-            className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors"
-          >
-            <Shield className="w-4 h-4" />
-            <span>Kelola User & Hak Akses</span>
-          </button>
-          
-          <button
-            onClick={() => {
-              DataService.logout();
-              window.location.reload();
-            }}
-            className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Keluar Aplikasi</span>
-          </button>
-        </div>
-      </div>
+
 
       <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-5">
         {/* Header */}
@@ -675,206 +638,218 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
         </div>
 
-        {/* 2-Column Settings Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Kolom Kiri: Pengaturan Google Drive */}
-          <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <Folder className="w-4 h-4 text-amber-500" />
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Pengaturan Google Drive (Foto)
-                </h4>
+        {/* Google Card Content (rest of the content) */}
+        {isAdmin ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Kolom Kiri: Pengaturan Google Drive */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Folder className="w-4 h-4 text-amber-500" />
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      Pengaturan Google Drive (Foto)
+                    </h4>
+                  </div>
+                  <a
+                    href="https://drive.google.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-blue-600 hover:underline flex items-center gap-1"
+                  >
+                    <span>Buka Drive</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <label className="block text-slate-700 font-semibold mb-1">
+                      Nama Folder Default di Drive:
+                    </label>
+                    <input
+                      type="text"
+                      value={googleSettings.driveFolderName}
+                      onChange={(e) => setGoogleSettings({ ...googleSettings, driveFolderName: e.target.value })}
+                      placeholder="SIM-TK204_Dokumentasi_Proyek"
+                      className="w-full font-mono text-xs px-3 py-2 rounded-lg border border-slate-300 focus:outline-hidden focus:border-[#F28C28]"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      Folder di Google Drive tempat menampung seluruh foto progres lapangan.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-semibold mb-1">
+                      Prefix Awalan Penamaan Foto:
+                    </label>
+                    <input
+                      type="text"
+                      value={googleSettings.photoNamingPrefix}
+                      onChange={(e) => setGoogleSettings({ ...googleSettings, photoNamingPrefix: e.target.value })}
+                      placeholder="DOK"
+                      className="w-full font-mono text-xs px-3 py-2 rounded-lg border border-slate-300 focus:outline-hidden focus:border-[#F28C28]"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      Format: [Prefix]_[KodeProyek]_[Tanggal]_[NamaBerkas]
+                    </p>
+                  </div>
+
+                  <label className="flex items-start gap-2.5 pt-1 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={googleSettings.autoCompressPhotos}
+                      onChange={(e) => setGoogleSettings({ ...googleSettings, autoCompressPhotos: e.target.checked })}
+                      className="mt-0.5 rounded text-[#F28C28] focus:ring-[#F28C28]"
+                    />
+                    <span className="text-slate-700 leading-tight">
+                      <strong>Kompresi Gambar Otomatis</strong> — Mengoptimalkan ukuran gambar sebelum diunggah untuk menghemat bandwidth lapangan dan kuota Google Drive.
+                    </span>
+                  </label>
+
+                  {/* Uji Koneksi Google Drive */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={handleTestDrive}
+                      disabled={isTestingDrive}
+                      className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold transition-colors disabled:opacity-50 min-h-[38px]"
+                    >
+                      <Folder className="w-3.5 h-3.5 text-amber-600" />
+                      <span>{isTestingDrive ? 'Menguji Koneksi Drive...' : 'Uji Koneksi Google Drive (API v3)'}</span>
+                    </button>
+                  </div>
+                </div>
               </div>
-              <a
-                href="https://drive.google.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[11px] text-blue-600 hover:underline flex items-center gap-1"
+
+              {/* Kolom Kanan: Pengaturan Google Sheets */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      Pengaturan Google Sheets (Ekspor)
+                    </h4>
+                  </div>
+                  <a
+                    href="https://sheets.google.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-emerald-700 hover:underline flex items-center gap-1"
+                  >
+                    <span>Buka Sheets</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+
+                <div className="space-y-2.5 text-xs">
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={googleSettings.sheetsIncludeProjectHeader}
+                      onChange={(e) => setGoogleSettings({ ...googleSettings, sheetsIncludeProjectHeader: e.target.checked })}
+                      className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span className="text-slate-700 leading-tight">
+                      <strong>Sertakan Header Proyek</strong> — Menambahkan nama proyek dan tanggal periode di bagian atas lembar spreadsheet.
+                    </span>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={googleSettings.sheetsIncludeSummaryRow}
+                      onChange={(e) => setGoogleSettings({ ...googleSettings, sheetsIncludeSummaryRow: e.target.checked })}
+                      className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span className="text-slate-700 leading-tight">
+                      <strong>Sertakan Baris Total Harian</strong> — Menyertakan baris akumulasi total orang-hari dan rata-rata di bawah tabel matriks.
+                    </span>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={googleSettings.sheetsNumberFormatId}
+                      onChange={(e) => setGoogleSettings({ ...googleSettings, sheetsNumberFormatId: e.target.checked })}
+                      className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span className="text-slate-700 leading-tight">
+                      <strong>Format Angka Standar Indonesia</strong> — Menampilkan angka dengan pemisah koma desimal Indonesia.
+                    </span>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={googleSettings.autoOpenSpreadsheetAfterExport}
+                      onChange={(e) => setGoogleSettings({ ...googleSettings, autoOpenSpreadsheetAfterExport: e.target.checked })}
+                      className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span className="text-slate-700 leading-tight">
+                      <strong>Buka Otomatis setelah Ekspor</strong> — Membuka spreadsheet baru di tab peramban langsung setelah proses selesai.
+                    </span>
+                  </label>
+
+                  {/* Uji Ekspor Google Sheets */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={handleTestCreateSheet}
+                      disabled={isTestingSheets}
+                      className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold transition-colors disabled:opacity-50 min-h-[38px]"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{isTestingSheets ? 'Menguji Pembuatan Sheet...' : 'Uji Buat Dokumen di Google Sheets'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Feedback message for Drive test */}
+            {driveTestMsg && (
+              <div
+                className={`p-3 rounded-lg border text-xs flex items-center gap-2 ${
+                  driveTestMsg.success
+                    ? 'bg-amber-50 border-amber-300 text-amber-900 font-semibold'
+                    : 'bg-rose-50 border-rose-300 text-rose-900'
+                }`}
               >
-                <span>Buka Drive</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-700 font-semibold mb-1">
-                  Nama Folder Default di Drive:
-                </label>
-                <input
-                  type="text"
-                  value={googleSettings.driveFolderName}
-                  onChange={(e) => setGoogleSettings({ ...googleSettings, driveFolderName: e.target.value })}
-                  placeholder="SIM-TK204_Dokumentasi_Proyek"
-                  className="w-full font-mono text-xs px-3 py-2 rounded-lg border border-slate-300 focus:outline-hidden focus:border-[#F28C28]"
-                />
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  Folder di Google Drive tempat menampung seluruh foto progres lapangan.
-                </p>
+                {driveTestMsg.success ? (
+                  <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
+                ) : (
+                  <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                )}
+                <span className="break-all">{driveTestMsg.text}</span>
               </div>
+            )}
 
-              <div>
-                <label className="block text-slate-700 font-semibold mb-1">
-                  Prefix Awalan Penamaan Foto:
-                </label>
-                <input
-                  type="text"
-                  value={googleSettings.photoNamingPrefix}
-                  onChange={(e) => setGoogleSettings({ ...googleSettings, photoNamingPrefix: e.target.value })}
-                  placeholder="DOK"
-                  className="w-full font-mono text-xs px-3 py-2 rounded-lg border border-slate-300 focus:outline-hidden focus:border-[#F28C28]"
-                />
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  Format: [Prefix]_[KodeProyek]_[Tanggal]_[NamaBerkas]
-                </p>
-              </div>
-
-              <label className="flex items-start gap-2.5 pt-1 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={googleSettings.autoCompressPhotos}
-                  onChange={(e) => setGoogleSettings({ ...googleSettings, autoCompressPhotos: e.target.checked })}
-                  className="mt-0.5 rounded text-[#F28C28] focus:ring-[#F28C28]"
-                />
-                <span className="text-slate-700 leading-tight">
-                  <strong>Kompresi Gambar Otomatis</strong> — Mengoptimalkan ukuran gambar sebelum diunggah untuk menghemat bandwidth lapangan dan kuota Google Drive.
-                </span>
-              </label>
-
-              {/* Uji Koneksi Google Drive */}
-              <div className="pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={handleTestDrive}
-                  disabled={isTestingDrive}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold transition-colors disabled:opacity-50 min-h-[38px]"
-                >
-                  <Folder className="w-3.5 h-3.5 text-amber-600" />
-                  <span>{isTestingDrive ? 'Menguji Koneksi Drive...' : 'Uji Koneksi Google Drive (API v3)'}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Kolom Kanan: Pengaturan Google Sheets */}
-          <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Pengaturan Google Sheets (Ekspor)
-                </h4>
-              </div>
-              <a
-                href="https://sheets.google.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[11px] text-emerald-700 hover:underline flex items-center gap-1"
+            {/* Feedback message for sheets test */}
+            {sheetsTestMsg && (
+              <div
+                className={`p-3 rounded-lg border text-xs flex items-center gap-2 ${
+                  sheetsTestMsg.success
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-semibold'
+                    : 'bg-rose-50 border-rose-300 text-rose-900'
+                }`}
               >
-                <span>Buka Sheets</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-
-            <div className="space-y-2.5 text-xs">
-              <label className="flex items-start gap-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={googleSettings.sheetsIncludeProjectHeader}
-                  onChange={(e) => setGoogleSettings({ ...googleSettings, sheetsIncludeProjectHeader: e.target.checked })}
-                  className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500"
-                />
-                <span className="text-slate-700 leading-tight">
-                  <strong>Sertakan Header Proyek</strong> — Menambahkan nama proyek dan tanggal periode di bagian atas lembar spreadsheet.
-                </span>
-              </label>
-
-              <label className="flex items-start gap-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={googleSettings.sheetsIncludeSummaryRow}
-                  onChange={(e) => setGoogleSettings({ ...googleSettings, sheetsIncludeSummaryRow: e.target.checked })}
-                  className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500"
-                />
-                <span className="text-slate-700 leading-tight">
-                  <strong>Sertakan Baris Total Harian</strong> — Menyertakan baris akumulasi total orang-hari dan rata-rata di bawah tabel matriks.
-                </span>
-              </label>
-
-              <label className="flex items-start gap-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={googleSettings.sheetsNumberFormatId}
-                  onChange={(e) => setGoogleSettings({ ...googleSettings, sheetsNumberFormatId: e.target.checked })}
-                  className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500"
-                />
-                <span className="text-slate-700 leading-tight">
-                  <strong>Format Angka Standar Indonesia</strong> — Menampilkan angka dengan pemisah koma desimal Indonesia.
-                </span>
-              </label>
-
-              <label className="flex items-start gap-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={googleSettings.autoOpenSpreadsheetAfterExport}
-                  onChange={(e) => setGoogleSettings({ ...googleSettings, autoOpenSpreadsheetAfterExport: e.target.checked })}
-                  className="mt-0.5 rounded text-emerald-600 focus:ring-emerald-500"
-                />
-                <span className="text-slate-700 leading-tight">
-                  <strong>Buka Otomatis setelah Ekspor</strong> — Membuka spreadsheet baru di tab peramban langsung setelah proses selesai.
-                </span>
-              </label>
-
-              {/* Uji Ekspor Google Sheets */}
-              <div className="pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={handleTestCreateSheet}
-                  disabled={isTestingSheets}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold transition-colors disabled:opacity-50 min-h-[38px]"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>{isTestingSheets ? 'Menguji Pembuatan Sheet...' : 'Uji Buat Dokumen di Google Sheets'}</span>
-                </button>
+                {sheetsTestMsg.success ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                )}
+                <span className="break-all">{sheetsTestMsg.text}</span>
               </div>
+            )}
+          </>
+        ) : (
+          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center gap-4 text-slate-500">
+            <Lock className="w-8 h-8 text-slate-400" />
+            <div className="text-sm">
+              <p className="font-bold text-slate-700">Integrasi Google Workspace Terkunci</p>
+              <p>Pengaturan integrasi Google Drive & Sheets hanya dapat diakses oleh Administrator Sistem.</p>
             </div>
-          </div>
-        </div>
-
-        {/* Feedback message for Drive test */}
-        {driveTestMsg && (
-          <div
-            className={`p-3 rounded-lg border text-xs flex items-center gap-2 ${
-              driveTestMsg.success
-                ? 'bg-amber-50 border-amber-300 text-amber-900 font-semibold'
-                : 'bg-rose-50 border-rose-300 text-rose-900'
-            }`}
-          >
-            {driveTestMsg.success ? (
-              <CheckCircle2 className="w-4 h-4 text-amber-600 shrink-0" />
-            ) : (
-              <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            )}
-            <span className="break-all">{driveTestMsg.text}</span>
-          </div>
-        )}
-
-        {/* Feedback message for sheets test */}
-        {sheetsTestMsg && (
-          <div
-            className={`p-3 rounded-lg border text-xs flex items-center gap-2 ${
-              sheetsTestMsg.success
-                ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-semibold'
-                : 'bg-rose-50 border-rose-300 text-rose-900'
-            }`}
-          >
-            {sheetsTestMsg.success ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            ) : (
-              <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            )}
-            <span className="break-all">{sheetsTestMsg.text}</span>
           </div>
         )}
 
@@ -1093,22 +1068,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
         </div>
 
-        {/* Email Restriction Setting */}
-        <div className="px-1 py-3 border-t border-slate-100">
-          <label className="block text-xs font-bold text-slate-700 mb-1.5">
-            Batasi Akses ke Email Akun Google Resmi:
-          </label>
-          <input
-            type="email"
-            value={googleSettings.allowedEmail || ''}
-            onChange={(e) => setGoogleSettings({ ...googleSettings, allowedEmail: e.target.value })}
-            placeholder="contoh: admin@perusahaan.co.id"
-            className="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-200"
-          />
-          <p className="text-[10px] text-slate-500 mt-1">
-            Data Google Drive & Sheets hanya akan terhubung jika email akun yang digunakan cocok dengan email ini. Kosongkan untuk menonaktifkan pembatasan.
-          </p>
-        </div>
+
 
         {/* Buttons: Save & Reset */}
         <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-t border-slate-100">
@@ -1177,230 +1137,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
       </div>
 
-      {/* 3. Cloud Synchronization: Push Local Data to Supabase */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-3">
-        <div className="flex items-center gap-2">
-          <CloudUpload className="w-5 h-5 text-[#F28C28]" />
-          <h3 className="font-bold text-slate-800 text-sm sm:text-base">
-            Sinkronisasi Data Lokal ke Supabase Cloud
-          </h3>
-        </div>
 
-        <p className="text-xs text-slate-600 leading-relaxed">
-          Setelah membuat tabel di Supabase SQL Editor, gunakan tombol ini untuk langsung mengunggah seluruh proyek, master jabatan, dan catatan tenaga kerja harian ke database online.
-        </p>
 
-        {syncStatus && (
-          <div
-            className={`p-3 rounded-lg border text-xs flex items-center gap-2 ${
-              syncStatus.success
-                ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-semibold'
-                : 'bg-rose-50 border-rose-300 text-rose-900'
-            }`}
-          >
-            {syncStatus.success ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" /> : <XCircle className="w-4 h-4 text-rose-600 shrink-0" />}
-            <span>{syncStatus.message}</span>
-          </div>
-        )}
 
-        {/* Dedicated RLS Error Fix Box if RLS violation detected */}
-        {syncStatus && !syncStatus.success && syncStatus.message.toLowerCase().includes('row-level security') && (
-          <div className="p-4 rounded-xl border border-amber-300 bg-amber-50/80 space-y-3 text-xs">
-            <div className="flex items-start gap-2.5">
-              <ShieldAlert className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="font-bold text-amber-950 text-sm">
-                  Solusi Perbaikan: Kebijakan Row-Level Security (RLS) di Supabase
-                </h4>
-                <p className="text-amber-900 mt-1 leading-relaxed">
-                  Database Supabase Anda menolak operasi simpan/unggah data karena kebijakan keamanan tabel (<code className="font-mono font-bold">projects</code>) saat ini membatasi kunci API anonim. Ikuti langkah mudah berikut untuk mengizinkan sinkronisasi:
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg p-3 border border-amber-200 space-y-2 text-slate-700">
-              <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-900 flex items-center justify-center text-xs">1</span>
-                <span>Langkah 1: Salin Skrip Perbaikan RLS di bawah ini</span>
-              </div>
-              <div className="flex items-center gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={handleCopyRlsSql}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
-                >
-                  {copiedRlsSql ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedRlsSql ? 'SQL Berhasil Disalin!' : 'Salin Skrip Perbaikan RLS (1 Klik)'}</span>
-                </button>
-                <a
-                  href="https://supabase.com/dashboard"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs transition-colors"
-                >
-                  <span>Buka Supabase Dashboard</span>
-                  <ExternalLink className="w-3 h-3 text-slate-500" />
-                </a>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg p-3 border border-amber-200 space-y-1.5 text-slate-700">
-              <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-900 flex items-center justify-center text-xs">2</span>
-                <span>Langkah 2: Jalankan di Supabase SQL Editor</span>
-              </div>
-              <p className="text-[11px] text-slate-600 leading-relaxed">
-                Di Supabase Dashboard proyek Anda, klik menu <strong>SQL Editor</strong> &gt; klik <strong>New query</strong> &gt; tempelkan (<em>Paste</em>) kode yang telah disalin &gt; lalu klik tombol <strong>Run</strong>.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-lg p-3 border border-amber-200 space-y-1.5 text-slate-700">
-              <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-900 flex items-center justify-center text-xs">3</span>
-                <span>Langkah 3: Klik Ulang Tombol Sinkronisasi di Bawah</span>
-              </div>
-              <p className="text-[11px] text-slate-600 leading-relaxed">
-                Setelah menjalankan query perbaikan, seluruh proyek, jabatan, dan catatan harian akan berhasil terunggah tanpa kendala RLS.
-              </p>
-            </div>
-
-            {/* Preview of the RLS fix query */}
-            <div className="bg-slate-900 text-slate-200 p-2.5 rounded-lg font-mono text-[10px] overflow-x-auto max-h-32 border border-slate-800">
-              <pre>{SIM_TK204_RLS_FIX_SQL}</pre>
-            </div>
-          </div>
-        )}
-
-        <div className="pt-1">
-          <button
-            onClick={handleSyncToSupabase}
-            disabled={isSyncing || !isConfigured}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold disabled:opacity-40 transition-colors min-h-[44px] w-full sm:w-auto"
-          >
-            <CloudUpload className="w-4 h-4" />
-            <span>{isSyncing ? 'Mengunggah Data...' : 'Unggah & Sinkronisasi Seluruh Data ke Supabase'}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 4. Live Supabase Auth Sign In / Sign Up */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <UserCheck className="w-5 h-5 text-purple-700" />
-            <div>
-              <h3 className="font-bold text-slate-800 text-sm sm:text-base">
-                Autentikasi Supabase Auth
-              </h3>
-              <p className="text-xs text-slate-500">
-                Login akun riil dengan email & kata sandi ke Supabase Auth
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center bg-slate-100 p-0.5 rounded-lg text-xs">
-            <button
-              onClick={() => setAuthMode('login')}
-              className={`px-3 py-1.5 rounded-md font-semibold transition-colors min-h-[36px] ${
-                authMode === 'login' ? 'bg-white shadow text-slate-900' : 'text-slate-600'
-              }`}
-            >
-              Masuk
-            </button>
-            <button
-              onClick={() => setAuthMode('register')}
-              className={`px-3 py-1.5 rounded-md font-semibold transition-colors min-h-[36px] ${
-                authMode === 'register' ? 'bg-white shadow text-slate-900' : 'text-slate-600'
-              }`}
-            >
-              Daftar Baru
-            </button>
-          </div>
-        </div>
-
-        {authMessage && (
-          <div
-            className={`p-3 rounded-lg border text-xs flex items-center gap-2 ${
-              authMessage.success
-                ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-semibold'
-                : 'bg-rose-50 border-rose-300 text-rose-900'
-            }`}
-          >
-            {authMessage.success ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <XCircle className="w-4 h-4 text-rose-600" />}
-            <span>{authMessage.text}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSupabaseAuth} className="space-y-3">
-          {authMode === 'register' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap *</label>
-                <input
-                  type="text"
-                  value={authFullName}
-                  onChange={(e) => setAuthFullName(e.target.value)}
-                  placeholder="Ir. Budi Santoso"
-                  className="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-hidden min-h-[44px]"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Peran Pengguna (Role) *</label>
-                <select
-                  value={authRole}
-                  onChange={(e) => setAuthRole(e.target.value as UserRole)}
-                  className="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white min-h-[44px]"
-                >
-                  <option value="admin">Administrator</option>
-                  <option value="project_manager">Project Manager</option>
-                  <option value="editor">Site Editor / Pencatat</option>
-                  <option value="viewer">Viewer (Hanya Lihat)</option>
-                </select>
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Email Akun *</label>
-              <input
-                type="email"
-                value={authEmail}
-                onChange={(e) => setAuthEmail(e.target.value)}
-                placeholder="nama@perusahaan.co.id"
-                className="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-hidden min-h-[44px]"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Kata Sandi *</label>
-              <input
-                type="password"
-                value={authPassword}
-                onChange={(e) => setAuthPassword(e.target.value)}
-                placeholder="Minimal 6 karakter"
-                className="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-hidden min-h-[44px]"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="pt-2 flex items-center justify-between">
-            <span className="text-[11px] text-slate-500">
-              Pengguna saat ini: <strong>{currentUser.full_name}</strong> ({currentUser.role.toUpperCase()})
-            </span>
-            <button
-              type="submit"
-              disabled={isAuthLoading || !isConfigured}
-              className="flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-lg bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold disabled:opacity-40 transition-colors min-h-[44px]"
-            >
-              <KeyRound className="w-4 h-4" />
-              <span>{isAuthLoading ? 'Memproses...' : authMode === 'login' ? 'Masuk dengan Supabase' : 'Daftar Akun Baru'}</span>
-            </button>
-          </div>
-        </form>
-      </div>
 
       {/* 4. Clear All Data Card */}
       <div className="bg-rose-50/50 rounded-xl border border-rose-200 p-4 sm:p-5 shadow-xs space-y-3">

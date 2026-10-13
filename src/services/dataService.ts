@@ -1,4 +1,4 @@
-import { Project, JobRole, DailyManpower, UserProfile, UserRole, DailyReportNarrative, AppNotification, DriveDocumentationPhoto, GoogleIntegrationSettings } from '../types';
+import { Project, JobRole, DailyManpower, UserProfile, UserRole, DailyReportNarrative, AppNotification, DriveDocumentationPhoto, GoogleIntegrationSettings, ReportPackage } from '../types';
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase';
 import { generateUUID, isValidUUID } from '../lib/uuid';
 
@@ -7,6 +7,7 @@ const KEY_PROJECTS = 'sim_tk204_projects';
 const KEY_ROLES = 'sim_tk204_roles';
 const KEY_MANPOWER = 'sim_tk204_manpower';
 const KEY_DAILY_REPORTS = 'sim_tk204_daily_reports';
+const KEY_REPORT_PACKAGES = 'sim_tk204_report_packages';
 const KEY_ACTIVE_PROJECT = 'sim_tk204_active_project_id';
 const KEY_CURRENT_USER = 'sim_tk204_current_user';
 const KEY_DEMO_LOADED = 'sim_tk204_demo_loaded';
@@ -466,85 +467,11 @@ export class DataService {
 
     const demoLoaded = localStorage.getItem(KEY_DEMO_LOADED);
     if (!demoLoaded || forceReset) {
-      const demoPrj = INITIAL_DEMO_PROJECT;
-      const demoRoles = INITIAL_DEMO_ROLES;
-      const demoRecords = generateDemoRecords();
-
-      let projects: Project[] = [];
-      let roles: JobRole[] = [];
-      let manpower: DailyManpower[] = [];
-      let reports: DailyReportNarrative[] = [];
-      if (!forceReset) {
-        try {
-          projects = JSON.parse(localStorage.getItem(KEY_PROJECTS) || '[]');
-          roles = JSON.parse(localStorage.getItem(KEY_ROLES) || '[]');
-          manpower = JSON.parse(localStorage.getItem(KEY_MANPOWER) || '[]');
-          reports = JSON.parse(localStorage.getItem(KEY_DAILY_REPORTS) || '[]');
-        } catch {
-          // ignore
-        }
-      }
-
-      // Add demo project if not present
-      if (!projects.some((p) => p.id === demoPrj.id)) {
-        projects.unshift(demoPrj);
-      }
-      // Add demo roles if not present
-      for (const r of demoRoles) {
-        if (!roles.some((x) => x.id === r.id)) {
-          roles.push(r);
-        }
-      }
-      // Add demo manpower records
-      for (const m of demoRecords) {
-        if (!manpower.some((x) => x.id === m.id)) {
-          manpower.push(m);
-        }
-      }
-
-      // Add demo daily report narratives if not present
-      const demoReportsList: DailyReportNarrative[] = [
-        {
-          project_id: DEMO_PROJECT_ID,
-          work_date: '2026-10-11',
-          rencana_m6: '1,755%',
-          realisasi_m6: '3,483%',
-          deviasi_m6: '1,728%',
-          pekerjaan: '-',
-          peralatan: '',
-          kendala: '- material utama belum ada',
-          cuaca: '- Jam 08:00 - 17.00 Cerah',
-          material_masuk: '- saat ini belum ada material masuk',
-          saran: '- Di tambah dudukan alas pijakan, agar pekerja lebih aman\n- lakukan mapping pekerjaan',
-          updated_at: '2026-10-11T17:00:00.000Z',
-        },
-        ...['2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08'].map((d) => ({
-          project_id: DEMO_PROJECT_ID,
-          work_date: d,
-          rencana_m6: '1,500%',
-          realisasi_m6: '1,500%',
-          deviasi_m6: '0,000%',
-          pekerjaan: '- Pekerjaan persiapan, pengukuran, dan galian struktur',
-          peralatan: '- Excavator, Genset',
-          kendala: '- Nihil',
-          cuaca: '- Cerah berawan',
-          material_masuk: '- Besi beton & kayu bekisting',
-          saran: '- Utamakan keselamatan kerja K3',
-          updated_at: `${d}T17:00:00.000Z`,
-        }))
-      ];
-
-      for (const rep of demoReportsList) {
-        if (!reports.some((x) => x.project_id === rep.project_id && x.work_date === rep.work_date)) {
-          reports.push(rep);
-        }
-      }
-
-      localStorage.setItem(KEY_PROJECTS, JSON.stringify(projects));
-      localStorage.setItem(KEY_ROLES, JSON.stringify(roles));
-      localStorage.setItem(KEY_MANPOWER, JSON.stringify(manpower));
-      localStorage.setItem(KEY_DAILY_REPORTS, JSON.stringify(reports));
-      localStorage.setItem(KEY_ACTIVE_PROJECT, demoPrj.id);
+      // Data initialized to empty state as requested.
+      localStorage.setItem(KEY_PROJECTS, JSON.stringify([]));
+      localStorage.setItem(KEY_ROLES, JSON.stringify([]));
+      localStorage.setItem(KEY_MANPOWER, JSON.stringify([]));
+      localStorage.setItem(KEY_DAILY_REPORTS, JSON.stringify([]));
       localStorage.setItem(KEY_DEMO_LOADED, 'true');
     }
   }
@@ -1143,6 +1070,87 @@ export class DataService {
       return all.filter((r) => r.project_id === projectId).sort((a, b) => b.work_date.localeCompare(a.work_date));
     } catch {
       return [];
+    }
+  }
+
+  static deleteDailyReportNarrative(projectId: string, workDate: string): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const all: DailyReportNarrative[] = JSON.parse(localStorage.getItem(KEY_DAILY_REPORTS) || '[]');
+      const filtered = all.filter((r) => !(r.work_date === workDate && (r.project_id === projectId || !r.project_id || !projectId)));
+      localStorage.setItem(KEY_DAILY_REPORTS, JSON.stringify(filtered));
+    } catch (err) {
+      console.error('Error deleting daily report narrative:', err);
+    }
+  }
+
+  // --- REPORT PACKAGES (ARSIP PAKET LAPORAN) ---
+  static getReportPackages(projectId: string): ReportPackage[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem(KEY_REPORT_PACKAGES);
+      if (stored !== null) {
+        const all: ReportPackage[] = JSON.parse(stored);
+        return all.filter((p) => p.project_id === projectId || !p.project_id || !projectId);
+      }
+    } catch {
+      // fallback
+    }
+
+    // Default package for this project
+    const defaultPackages: ReportPackage[] = [
+      {
+        id: `pkg-demo-${projectId}`,
+        project_id: projectId,
+        name: 'Monitoring Mingguan Periode Demo (2–8 Oktober 2026)',
+        start: '2026-10-02',
+        end: '2026-10-08',
+        created_at: '2026-10-08T17:00:00.000Z',
+      },
+    ];
+    try {
+      localStorage.setItem(KEY_REPORT_PACKAGES, JSON.stringify(defaultPackages));
+    } catch {
+      // ignore
+    }
+    return defaultPackages;
+  }
+
+  static saveReportPackage(pkg: ReportPackage): void {
+    if (typeof window === 'undefined') return;
+    try {
+      let all: ReportPackage[] = [];
+      const stored = localStorage.getItem(KEY_REPORT_PACKAGES);
+      if (stored) {
+        all = JSON.parse(stored);
+      } else {
+        all = this.getReportPackages(pkg.project_id);
+      }
+
+      const idx = all.findIndex((p) => p.id === pkg.id);
+      if (idx >= 0) {
+        all[idx] = pkg;
+      } else {
+        all.unshift(pkg);
+      }
+      localStorage.setItem(KEY_REPORT_PACKAGES, JSON.stringify(all));
+    } catch (err) {
+      console.error('Error saving report package:', err);
+    }
+  }
+
+  static deleteReportPackage(id: string): void {
+    if (typeof window === 'undefined') return;
+    try {
+      let all: ReportPackage[] = [];
+      const stored = localStorage.getItem(KEY_REPORT_PACKAGES);
+      if (stored) {
+        all = JSON.parse(stored);
+      }
+      all = all.filter((p) => p.id !== id);
+      localStorage.setItem(KEY_REPORT_PACKAGES, JSON.stringify(all));
+    } catch (err) {
+      console.error('Error deleting report package:', err);
     }
   }
 

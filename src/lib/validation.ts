@@ -90,7 +90,7 @@ export function validateProjectData(data: {
   site_manager?: string;
 }): ValidationResult {
   if (!data.code || data.code.trim() === '') {
-    return { isValid: false, error: 'Kode proyek wajib diisi.' };
+    return { isValid: false, error: 'Nomor Kontrak wajib diisi.' };
   }
   if (!data.name || data.name.trim() === '') {
     return { isValid: false, error: 'Nama proyek wajib diisi.' };

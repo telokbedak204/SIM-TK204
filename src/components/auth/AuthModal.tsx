@@ -227,8 +227,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuthSuc
                 onChange={(e) => setRole(e.target.value as UserRole)}
                 className="w-full text-xs sm:text-sm px-3 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-orange-200 focus:outline-hidden min-h-[44px] bg-white font-medium"
               >
-                <option value="editor">Site Editor (Bisa Catat & Edit Tenaga Kerja)</option>
+                <option value="editor">Site Editor / Pencatat (Input Lapangan)</option>
                 <option value="project_manager">Project Manager (Kelola & Validasi Laporan Proyek)</option>
+                <option value="site_engineer">Site Engineer / Ahli Teknik</option>
+                <option value="hse_officer">Ahli K3 / HSE Officer</option>
+                <option value="estimator">Estimator & Cost Control</option>
+                <option value="qa_qc">Ahli QA / QC</option>
+                <option value="supervisor">Pengawas Lapangan / Supervisor</option>
                 <option value="viewer">Viewer (Hanya Melihat Laporan & Dashboard)</option>
                 <option value="admin">Administrator (Akses Penuh Seluruh Sistem)</option>
               </select>

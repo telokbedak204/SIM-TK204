@@ -77,13 +77,6 @@ export const WeeklyReportPage: React.FC<WeeklyReportPageProps> = ({
                 className="bg-transparent font-semibold text-slate-800 focus:outline-hidden"
               />
             </div>
-
-            <button
-              onClick={() => onDateRangeChange('2026-10-02', '2026-10-08')}
-              className="xs:col-span-2 sm:col-span-1 px-4 py-2 rounded-lg bg-orange-100 hover:bg-orange-200 text-[#F28C28] text-xs font-bold transition-colors min-h-[44px] flex items-center justify-center"
-            >
-              Demo 7 Hari
-            </button>
           </div>
         </div>
 

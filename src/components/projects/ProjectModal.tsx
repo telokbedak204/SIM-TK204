@@ -133,16 +133,16 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Kode & Nama */}
+            {/* Nomor Kontrak */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Kode Proyek *
+                Nomor Kontrak *
               </label>
               <input
                 type="text"
                 value={formData.code}
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                placeholder="Contoh: PRJ-2026-ANB-04"
+                placeholder="Contoh: PRJ-2026-ANB-04 / No. SPK / Kontrak"
                 className="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-orange-200 focus:outline-hidden"
                 required
               />

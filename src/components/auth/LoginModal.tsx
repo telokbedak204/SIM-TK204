@@ -85,6 +85,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const roleBadgeStyle: Record<UserRole, string> = {
     admin: 'bg-purple-100 text-purple-800 border-purple-200',
     project_manager: 'bg-blue-100 text-blue-800 border-blue-200',
+    site_engineer: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+    hse_officer: 'bg-amber-100 text-amber-800 border-amber-200',
+    estimator: 'bg-teal-100 text-teal-800 border-teal-200',
+    qa_qc: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+    supervisor: 'bg-sky-100 text-sky-800 border-sky-200',
     editor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
     viewer: 'bg-slate-100 text-slate-700 border-slate-200',
   };
@@ -92,6 +97,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const roleNameMap: Record<UserRole, string> = {
     admin: 'Administrator',
     project_manager: 'Project Manager',
+    site_engineer: 'Site Engineer',
+    hse_officer: 'HSE Officer',
+    estimator: 'Estimator',
+    qa_qc: 'Ahli QA/QC',
+    supervisor: 'Supervisor',
     editor: 'Site Editor',
     viewer: 'Viewer',
   };
@@ -103,7 +113,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-15 bg-[radial-gradient(#F28C28_1px,transparent_1px)] bg-[size:14px_14px] pointer-events-none" />
         <div className="flex items-start justify-between relative z-10">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-[#F28C28] flex items-center justify-center text-white shadow-lg border border-orange-400/40 shrink-0">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#F28C28] to-orange-600 flex items-center justify-center text-white shadow-lg border border-white/10 shrink-0">
               <img
                 src="/pwa-192x192.png"
                 alt="Logo SIM-TK204"
@@ -115,15 +125,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <h3 className="font-black text-base sm:text-lg text-white tracking-wide">
+                <h3 className="font-bold text-lg text-white tracking-tight">
                   SIM-TK204
                 </h3>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-[#F28C28] border border-orange-500/30">
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500/20 text-[#F28C28] border border-orange-500/30">
                   Portal Masuk
                 </span>
               </div>
-              <p className="text-xs text-orange-200/90 font-medium mt-0.5">
-                Sistem Informasi Monitoring Tenaga Kerja Konstruksi
+              <p className="text-xs text-slate-300 font-medium mt-0.5">
+                Sistem Informasi Monitoring
               </p>
             </div>
           </div>
@@ -131,7 +141,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           {!isFullPage && onClose && (
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
               aria-label="Tutup"
             >
               <X className="w-5 h-5" />
@@ -204,44 +214,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           </button>
         </form>
 
-        {/* Quick Demo User Auto-Fill List */}
-        <div className="pt-3 border-t border-slate-100 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>Pilih Cepat Akun Terdaftar:</span>
-            </span>
-            <span className="text-[10px] text-slate-400">Klik untuk isi form</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
-            {systemUsers.map((u) => {
-              const isSelected = identifier === u.email;
-              const roleKey = u.role as UserRole;
-              return (
-                <button
-                  key={u.id}
-                  type="button"
-                  onClick={() => handleQuickSelectUser(u)}
-                  className={`text-left p-2.5 rounded-xl border text-xs transition-all flex items-start justify-between gap-1.5 min-h-[44px] ${
-                    isSelected
-                      ? 'border-[#F28C28] bg-orange-50/70 ring-1 ring-orange-300 font-medium'
-                      : 'border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="font-bold text-slate-900 truncate text-[11px]">{u.name}</div>
-                    <div className="text-[10px] font-mono text-slate-500 truncate">{u.email}</div>
-                  </div>
-                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${roleBadgeStyle[roleKey] || 'bg-slate-100'}`}>
-                    {roleNameMap[roleKey] || u.role}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
         {/* Security & Access Notice */}
         <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -249,6 +221,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             <span>Hak akses RBAC terenkripsi & sesi aman.</span>
           </div>
           <span className="font-mono text-[10px] text-slate-400">v2.0 PWA</span>
+        </div>
+        
+        <div className="text-center text-[10px] text-slate-400 pt-2">
+          @Copyright Azman204
         </div>
       </div>
     </div>

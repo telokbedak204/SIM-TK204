@@ -111,6 +111,36 @@ export const UserRolesPage: React.FC<UserRolesPageProps> = ({
       desc: 'Mengelola jadwal proyek, persetujuan laporan harian dan mingguan, serta pengawasan tenaga kerja.',
       permissions: ['Tambah & Edit Proyek Konstruksi', 'Validasi & Arsip Laporan Harian', 'Export Laporan PDF & Excel', 'Kelola Master Jabatan'],
     },
+    site_engineer: {
+      label: 'Site Engineer / Ahli Teknik',
+      badge: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      desc: 'Mengawasi teknis pelaksanaan konstruksi, mutu pekerjaan, dan spesifikasi struktur.',
+      permissions: ['Input & Review Data Teknis', 'Validasi Laporan Harian', 'Monitoring Kualitas Pekerjaan', 'Export Laporan Lapangan'],
+    },
+    hse_officer: {
+      label: 'Ahli K3 / HSE Officer',
+      badge: 'bg-amber-100 text-amber-800 border-amber-200',
+      desc: 'Bertanggung jawab atas Keselamatan dan Kesehatan Kerja (K3) serta APD di lokasi proyek.',
+      permissions: ['Catat Catatan & Kendala K3', 'Validasi Penggunaan APD', 'Inspeksi Keselamatan Kerja', 'Laporan Insiden/Saran K3'],
+    },
+    estimator: {
+      label: 'Estimator & Cost Control',
+      badge: 'bg-teal-100 text-teal-800 border-teal-200',
+      desc: 'Mengontrol anggaran, volume material masuk, progres finansial, dan deviasi RAB.',
+      permissions: ['Monitor Material Masuk', 'Analisis Progres & Deviasi', 'Manajemen Biaya & Anggaran', 'Export Laporan Keuangan/Progress'],
+    },
+    qa_qc: {
+      label: 'Ahli QA / QC',
+      badge: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+      desc: 'Quality Assurance & Quality Control untuk pengujian material dan struktur bangunan.',
+      permissions: ['Inspeksi Mutu Konstruksi', 'Validasi Pengujian Lapangan', 'Pencatatan Kendala Kualitas', 'Approval Dokumen Mutu'],
+    },
+    supervisor: {
+      label: 'Pengawas Lapangan / Supervisor',
+      badge: 'bg-sky-100 text-sky-800 border-sky-200',
+      desc: 'Mengawasi tukang dan mandor di lapangan secara langsung setiap hari.',
+      permissions: ['Input Mandor & Pekerja', 'Pencatatan Cuaca & Kendala', 'Monitoring Aktivitas Tukang', 'Input Progres Harian'],
+    },
     editor: {
       label: 'Site Editor / Pencatat',
       badge: 'bg-emerald-100 text-emerald-800 border-emerald-200',
@@ -342,7 +372,7 @@ export const UserRolesPage: React.FC<UserRolesPageProps> = ({
               Simulasi Ganti Role Instan:
             </label>
             <div className="grid grid-cols-2 gap-2">
-              {(['admin', 'project_manager', 'editor', 'viewer'] as UserRole[]).map((r) => {
+              {(['admin', 'project_manager', 'site_engineer', 'hse_officer', 'estimator', 'qa_qc', 'supervisor', 'editor', 'viewer'] as UserRole[]).map((r) => {
                 const isSelected = currentUser.role === r;
                 return (
                   <button
@@ -502,7 +532,7 @@ export const UserRolesPage: React.FC<UserRolesPageProps> = ({
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {(['admin', 'project_manager', 'editor', 'viewer'] as UserRole[]).map((r) => {
+          {(['admin', 'project_manager', 'site_engineer', 'hse_officer', 'estimator', 'qa_qc', 'supervisor', 'editor', 'viewer'] as UserRole[]).map((r) => {
             const role = roleDetails[r];
             const isCurrent = currentUser.role === r;
             return (
@@ -630,6 +660,11 @@ export const UserRolesPage: React.FC<UserRolesPageProps> = ({
                 >
                   <option value="admin">Administrator (Akses Penuh & Manajemen Password)</option>
                   <option value="project_manager">Project Manager (PM)</option>
+                  <option value="site_engineer">Site Engineer / Ahli Teknik</option>
+                  <option value="hse_officer">Ahli K3 / HSE Officer</option>
+                  <option value="estimator">Estimator & Cost Control</option>
+                  <option value="qa_qc">Ahli QA / QC</option>
+                  <option value="supervisor">Pengawas Lapangan / Supervisor</option>
                   <option value="editor">Site Editor / Pencatat</option>
                   <option value="viewer">Viewer (Hanya Lihat)</option>
                 </select>
@@ -828,6 +863,11 @@ export const UserRolesPage: React.FC<UserRolesPageProps> = ({
                 >
                   <option value="admin">Administrator (Akses Penuh & Manajemen Password)</option>
                   <option value="project_manager">Project Manager (PM - Validasi & Pengesahan)</option>
+                  <option value="site_engineer">Site Engineer / Ahli Teknik</option>
+                  <option value="hse_officer">Ahli K3 / HSE Officer</option>
+                  <option value="estimator">Estimator & Cost Control</option>
+                  <option value="qa_qc">Ahli QA / QC</option>
+                  <option value="supervisor">Pengawas Lapangan / Supervisor</option>
                   <option value="editor">Site Editor / Pencatat (Input Lapangan)</option>
                   <option value="viewer">Viewer (Hanya Lihat / Read-Only)</option>
                 </select>

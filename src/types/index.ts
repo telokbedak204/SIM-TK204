@@ -1,4 +1,13 @@
-export type UserRole = 'admin' | 'project_manager' | 'editor' | 'viewer';
+export type UserRole = 
+  | 'admin' 
+  | 'project_manager' 
+  | 'site_engineer' 
+  | 'hse_officer' 
+  | 'estimator' 
+  | 'qa_qc' 
+  | 'supervisor' 
+  | 'editor' 
+  | 'viewer';
 
 export interface UserProfile {
   id: string;
@@ -151,4 +160,13 @@ export interface GoogleIntegrationSettings {
   sheetsNumberFormatId: boolean;
   autoOpenSpreadsheetAfterExport: boolean;
   allowedEmail: string;
+}
+
+export interface ReportPackage {
+  id: string;
+  project_id: string;
+  name: string;
+  start: string;
+  end: string;
+  created_at?: string;
 }

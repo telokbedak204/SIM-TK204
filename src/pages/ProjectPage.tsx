@@ -283,7 +283,7 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({
                 <span className="col-span-2 font-mono text-slate-800">{selectedDetailProject.id}</span>
               </div>
               <div className="grid grid-cols-3 gap-1">
-                <span className="text-slate-500">Kode Proyek:</span>
+                <span className="text-slate-500">Nomor Kontrak:</span>
                 <span className="col-span-2 font-bold text-slate-800">{selectedDetailProject.code}</span>
               </div>
               <div className="grid grid-cols-3 gap-1">

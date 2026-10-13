@@ -54,6 +54,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   const roleLabels: Record<UserRole, { label: string; badge: string }> = {
     admin: { label: 'Administrator', badge: 'bg-purple-100 text-purple-800 border-purple-200' },
     project_manager: { label: 'Project Manager', badge: 'bg-blue-100 text-blue-800 border-blue-200' },
+    site_engineer: { label: 'Site Engineer', badge: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+    hse_officer: { label: 'HSE Officer', badge: 'bg-amber-100 text-amber-800 border-amber-200' },
+    estimator: { label: 'Estimator', badge: 'bg-teal-100 text-teal-800 border-teal-200' },
+    qa_qc: { label: 'Ahli QA/QC', badge: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
+    supervisor: { label: 'Supervisor', badge: 'bg-sky-100 text-sky-800 border-sky-200' },
     editor: { label: 'Site Editor / Pencatat', badge: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
     viewer: { label: 'Viewer (Hanya Lihat)', badge: 'bg-slate-100 text-slate-700 border-slate-200' },
   };
@@ -282,37 +287,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </button>
                   </div>
 
-                  {currentUser.role === 'admin' && (
-                      <div className="p-2">
-                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1 flex items-center justify-between">
-                          <span>Simulasi Peran (RBAC)</span>
-                          <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
-                        </div>
-                        {(['admin', 'project_manager', 'editor', 'viewer'] as UserRole[]).map((r) => {
-                          const isCurrent = currentUser.role === r;
-                          return (
-                            <button
-                              key={r}
-                              onClick={() => {
-                                onRoleChange(r);
-                                setShowRoleDropdown(false);
-                              }}
-                              className={`w-full text-left px-2.5 py-2 rounded-md text-xs flex items-center justify-between transition-colors min-h-[40px] ${
-                                isCurrent
-                                  ? 'bg-slate-100 font-bold text-[#142B4A]'
-                                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2">
-                                <UserCheck className={`w-3.5 h-3.5 ${isCurrent ? 'text-[#F28C28]' : 'text-slate-400'}`} />
-                                <span>{roleLabels[r].label}</span>
-                              </div>
-                              {isCurrent && <span className="text-[10px] text-emerald-600 font-bold">Aktif</span>}
-                            </button>
-                          );
-                        })}
-                      </div>
-                  )}
 
                   <div className="border-t border-slate-100 px-2 pt-2 space-y-1">
                     {onOpenLogin && (

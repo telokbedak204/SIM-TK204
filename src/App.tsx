@@ -44,10 +44,8 @@ export default function App() {
   const [selectedDailyDate, setSelectedDailyDate] = useState<string>('2026-10-02');
 
   // Authentication & Session
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
-    return DataService.isLoggedIn();
-  });
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(true);
 
   // Notifications & Modals
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -437,6 +435,7 @@ export default function App() {
                 }}
                 allDailyRecords={dailyRecords}
                 allRoles={jobRoles}
+                addToast={addToast}
               />
             )}
 
@@ -474,6 +473,7 @@ export default function App() {
 
             {currentTab === 'settings' && (
               <SettingsPage
+                currentUser={currentUser}
                 onRefreshData={loadData}
                 onNavigateToProjects={() => setCurrentTab('projects')}
                 onNavigateToUserRoles={() => setCurrentTab('user_roles')}
@@ -516,7 +516,7 @@ export default function App() {
       {/* Modal Masuk / Ganti Akun */}
       <LoginModal
         isOpen={isLoginModalOpen}
-        isFullPage={false}
+        isFullPage={true}
         onClose={() => setIsLoginModalOpen(false)}
         onLoginSuccess={handleLoginSuccess}
         addToast={addToast}
