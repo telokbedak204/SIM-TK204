@@ -402,7 +402,40 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </p>
       </div>
 
-      {/* 1. Supabase Connection Card */}
+      {/* 2. Database Maintenance Card */}
+      {isAdmin && (
+        <div className="bg-white rounded-xl border border-rose-200 p-4 sm:p-5 shadow-xs space-y-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-800 text-sm sm:text-base">
+                Pemeliharaan Database (Reset)
+              </h3>
+              <p className="text-xs text-slate-500">
+                Peringatan: Tindakan ini akan menghapus semua data lokal dan mereset sistem ke kondisi awal.
+              </p>
+            </div>
+          </div>
+          
+          <button
+            onClick={() => {
+              if (window.confirm('Apakah Anda yakin ingin menghapus semua data proyek? Tindakan ini tidak dapat dibatalkan.')) {
+                DataService.clearAllData();
+                onRefreshData();
+                addToast?.('success', 'Database berhasil direset.');
+              }
+            }}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors min-h-[44px]"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Reset Database & Hapus Data</span>
+          </button>
+        </div>
+      )}
+
+      {/* 3. Supabase Connection Card */}
       {isAdmin ? (
       <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">

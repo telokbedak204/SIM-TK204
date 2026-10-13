@@ -1280,17 +1280,27 @@ export class DataService {
   static clearAllData(): void {
     if (typeof window === 'undefined') return;
     
-    // Clear project data keys
-    localStorage.removeItem(KEY_PROJECTS);
-    localStorage.removeItem(KEY_ROLES);
-    localStorage.removeItem(KEY_MANPOWER);
-    localStorage.removeItem(KEY_DAILY_REPORTS);
-    localStorage.removeItem(KEY_DRIVE_PHOTOS);
-    localStorage.removeItem(KEY_ACTIVE_PROJECT);
-    localStorage.removeItem(KEY_DEMO_LOADED);
+    // Clear ALL project data keys
+    const keysToRemove = [
+      KEY_PROJECTS,
+      KEY_ROLES,
+      KEY_MANPOWER,
+      KEY_DAILY_REPORTS,
+      KEY_DRIVE_PHOTOS,
+      KEY_NOTIFICATIONS,
+      KEY_REPORT_PACKAGES,
+      KEY_ACTIVE_PROJECT,
+      KEY_DEMO_LOADED,
+      KEY_GOOGLE_SETTINGS
+    ];
+    
+    keysToRemove.forEach(key => localStorage.removeItem(key));
     
     // Reset to initial state
     this.initializeLocalData(true);
+    
+    // Force reload page to ensure UI state reflects empty database
+    window.location.reload();
   }
 
   static getGoogleSettings(): GoogleIntegrationSettings {
