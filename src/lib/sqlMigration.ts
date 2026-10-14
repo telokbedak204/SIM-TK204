@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS public.report_packages (
     project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     start DATE NOT NULL,
-    end DATE NOT NULL,
+    "end" DATE NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
@@ -285,7 +285,7 @@ INSERT INTO public.projects (
     'Ahmad Faisal (Site Admin)',
     'Dedi Kurniawan, ST (Inspector MK)',
     'active'
-) ON CONFLICT (code) DO NOTHING;
+) ON CONFLICT (id) DO NOTHING;
 
 -- Insert standard 8 job roles for the demo project
 INSERT INTO public.job_roles (project_id, name, sort_order, is_active)
