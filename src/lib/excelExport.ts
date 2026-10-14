@@ -31,8 +31,8 @@ export function generateWeeklyMonitoringExcelWorkbook(
   sheet1Data.push(['Nama Proyek', project.name, '', 'Kode Proyek', project.code]);
   sheet1Data.push(['Lokasi', project.location, '', 'Status', project.status.toUpperCase()]);
   sheet1Data.push(['Kontraktor Pelaksana', project.contractor_name, '', 'Konsultan MK', project.consultant_name]);
-  sheet1Data.push(['Pemilik Proyek', project.owner_name, '', 'Project Manager', project.project_manager]);
-  sheet1Data.push(['Site Manager', project.site_manager, '', 'Periode', `${formatDateIndo(startDateStr)} s/d ${formatDateIndo(endDateStr)}`]);
+  sheet1Data.push(['Pemilik Proyek', project.owner_name, '', 'Direksi Teknis', project.project_manager]);
+  sheet1Data.push(['Project Manager (PM)', project.site_manager, '', 'Periode', `${formatDateIndo(startDateStr)} s/d ${formatDateIndo(endDateStr)}`]);
   sheet1Data.push([]);
 
   // Table Headers:
@@ -224,8 +224,8 @@ export function generateWeeklyMonitoringExcelWorkbook(
     ['Tanggal Mulai Kontrak', formatDateIndo(project.start_date)],
     ['Tanggal Selesai Kontrak', formatDateIndo(project.end_date)],
     ['Status Pelaksanaan', project.status.toUpperCase()],
-    ['Project Manager (PM)', project.project_manager],
-    ['Site Manager (SM)', project.site_manager],
+    ['Direksi Teknis', project.project_manager],
+    ['Project Manager (PM)', project.site_manager],
     ['Petugas Pencatat Lapangan', recorderName || project.recorder_name || '-'],
     ['Pemeriksa / Inspector MK', inspectorName || project.inspector_name || '-']
   ];

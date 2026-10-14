@@ -229,7 +229,7 @@ export const WeeklyReportPage: React.FC<WeeklyReportPageProps> = ({
 
           <div>
             <label className="block text-slate-600 font-semibold mb-1">
-              3. Mengetahui (Project Manager):
+              3. Mengetahui (Direksi Teknis):
             </label>
             <input
               type="text"

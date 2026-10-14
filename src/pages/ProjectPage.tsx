@@ -309,11 +309,11 @@ export const ProjectPage: React.FC<ProjectPageProps> = ({
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-1">
-                <span className="text-slate-500">Project Manager:</span>
+                <span className="text-slate-500">Direksi Teknis:</span>
                 <span className="col-span-2 font-semibold text-slate-800">{selectedDetailProject.project_manager}</span>
               </div>
               <div className="grid grid-cols-3 gap-1">
-                <span className="text-slate-500">Site Manager:</span>
+                <span className="text-slate-500">Project Manager (PM):</span>
                 <span className="col-span-2 text-slate-800">{selectedDetailProject.site_manager}</span>
               </div>
               <div className="grid grid-cols-3 gap-1">

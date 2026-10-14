@@ -89,8 +89,14 @@ export function generateWeeklyMonitoringPDFDoc(
         [
           { content: 'Status Proyek', styles: { textColor: [100, 116, 139] } },
           { content: `: ${project.status.toUpperCase()}`, styles: { fontStyle: 'bold', textColor: project.status === 'active' ? [16, 149, 103] : [30, 41, 59] } },
+          { content: 'Direksi Teknis', styles: { textColor: [100, 116, 139] } },
+          { content: `: ${project.project_manager || '-'}`, styles: { textColor: [30, 41, 59] } },
+        ],
+        [
           { content: 'Project Manager', styles: { textColor: [100, 116, 139] } },
-          { content: `: ${project.project_manager}${project.site_manager ? ' / ' + project.site_manager : ''}`, styles: { textColor: [30, 41, 59] } },
+          { content: `: ${project.site_manager || '-'}`, styles: { textColor: [30, 41, 59] } },
+          { content: '', styles: {} },
+          { content: '', styles: {} },
         ],
       ],
       theme: 'plain',
@@ -361,10 +367,10 @@ export function generateWeeklyMonitoringPDFDoc(
         },
         {
           header: 'Mengetahui & Menyetujui:',
-          role: 'Pemberi Tugas / Direksi Lapangan',
-          sub: '(Project Manager / Pimpro)',
-          person: project.project_manager || 'Project Manager',
-          title: 'Project Manager Proyek',
+          role: 'Pemberi Tugas / Direksi Teknis',
+          sub: '(Direksi Teknis / Pimpro)',
+          person: project.project_manager || 'Direksi Teknis',
+          title: 'Direksi Teknis Proyek',
         },
       ];
 
@@ -561,8 +567,14 @@ export function generateDailyReportPDFDoc(params: DailyReportPDFParams): jsPDF {
       [
         { content: 'Mulai Kerja (SPMK)', styles: { textColor: [100, 116, 139] } },
         { content: `: ${formatDateIndo(project.start_date || selectedDate)}`, styles: { textColor: [30, 41, 59] } },
-        { content: 'Project Manager', styles: { textColor: [100, 116, 139] } },
+        { content: 'Direksi Teknis', styles: { textColor: [100, 116, 139] } },
         { content: `: ${project.project_manager || '-'}`, styles: { textColor: [30, 41, 59] } },
+      ],
+      [
+        { content: 'Project Manager (PM)', styles: { textColor: [100, 116, 139] } },
+        { content: `: ${project.site_manager || '-'}`, styles: { textColor: [30, 41, 59] } },
+        { content: '', styles: {} },
+        { content: '', styles: {} },
       ],
     ],
     theme: 'plain',
@@ -761,8 +773,8 @@ export function generateDailyReportPDFDoc(params: DailyReportPDFParams): jsPDF {
       header: 'Dibuat Oleh:',
       role: 'Kontraktor Pelaksana',
       org: project.contractor_name || 'Kontraktor Pelaksana',
-      person: recorderName || project.site_manager || 'Site Supervisor / Pelaksana',
-      title: 'Pelaksana Lapangan',
+      person: recorderName || project.site_manager || 'Project Manager',
+      title: 'Project Manager (PM)',
     },
     {
       header: 'Diperiksa Oleh:',
@@ -773,10 +785,10 @@ export function generateDailyReportPDFDoc(params: DailyReportPDFParams): jsPDF {
     },
     {
       header: 'Mengetahui & Menyetujui:',
-      role: 'Pemberi Tugas / Direksi',
+      role: 'Pemberi Tugas / Direksi Teknis',
       org: project.owner_name || 'Pemberi Tugas / Direksi',
-      person: project.project_manager || 'Project Manager',
-      title: 'Project Manager / Pimpro',
+      person: project.project_manager || 'Direksi Teknis',
+      title: 'Direksi Teknis / Pimpro',
     },
   ];
 

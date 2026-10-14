@@ -296,7 +296,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
             {/* Key Personnel */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Project Manager (PM) *
+                Direksi Teknis *
               </label>
               <input
                 type="text"
@@ -310,7 +310,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Site Manager (SM) *
+                Project Manager (PM) *
               </label>
               <input
                 type="text"
