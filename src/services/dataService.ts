@@ -435,6 +435,9 @@ export class DataService {
       const projects: Project[] = JSON.parse(localStorage.getItem(KEY_PROJECTS) || '[]');
       const roles: JobRole[] = JSON.parse(localStorage.getItem(KEY_ROLES) || '[]');
       const manpower: DailyManpower[] = JSON.parse(localStorage.getItem(KEY_MANPOWER) || '[]');
+      const narratives: DailyReportNarrative[] = JSON.parse(localStorage.getItem(KEY_DAILY_REPORTS) || '[]');
+      const photos: DriveDocumentationPhoto[] = JSON.parse(localStorage.getItem(KEY_DRIVE_PHOTOS) || '[]');
+      const packages: ReportPackage[] = JSON.parse(localStorage.getItem(KEY_REPORT_PACKAGES) || '[]');
 
       if (projects.length > 0) {
         const { error: prjErr } = await client.from('projects').upsert(projects);
@@ -442,7 +445,6 @@ export class DataService {
       }
 
       if (roles.length > 0) {
-        // Ensure projects are synced before roles to satisfy FK constraints
         const { error: roleErr } = await client
           .from('job_roles')
           .upsert(roles, { onConflict: 'project_id,name' });
@@ -450,16 +452,27 @@ export class DataService {
       }
 
       if (manpower.length > 0) {
-        // Ensure projects and roles are synced before manpower to satisfy FK constraints
         const { error: mpErr } = await client
           .from('daily_manpower')
           .upsert(manpower, { onConflict: 'project_id,job_role_id,work_date' });
         if (mpErr) throw new Error(`Tabel daily_manpower: ${mpErr.message}`);
       }
 
+      if (narratives.length > 0) {
+        await client.from('daily_report_narratives').upsert(narratives, { onConflict: 'project_id,work_date' });
+      }
+
+      if (photos.length > 0) {
+        await client.from('documentation_photos').upsert(photos, { onConflict: 'id' });
+      }
+
+      if (packages.length > 0) {
+        await client.from('report_packages').upsert(packages, { onConflict: 'id' });
+      }
+
       return {
         success: true,
-        message: `Sinkronisasi berhasil! ${projects.length} Proyek, ${roles.length} Jabatan, dan ${manpower.length} Catatan Harian berhasil disimpan permanen ke Supabase PostgreSQL.`,
+        message: `Sinkronisasi berhasil! ${projects.length} Proyek, ${roles.length} Jabatan, ${manpower.length} Manpower, ${narratives.length} Laporan Harian, dan ${photos.length} Foto berhasil disimpan ke Supabase PostgreSQL.`,
       };
     } catch (err) {
       const errMsg = (err as Error).message;
@@ -1084,7 +1097,26 @@ export class DataService {
   }
 
   // --- DAILY REPORT NARRATIVES ---
-  static getDailyReportNarrative(projectId: string, workDate: string): DailyReportNarrative | null {
+  static async getDailyReportNarrative(projectId: string, workDate: string): Promise<DailyReportNarrative | null> {
+    if (isSupabaseConfigured()) {
+      const client = getSupabase();
+      if (client) {
+        try {
+          const { data, error } = await client
+            .from('daily_report_narratives')
+            .select('*')
+            .eq('project_id', projectId)
+            .eq('work_date', workDate)
+            .maybeSingle();
+          if (!error && data) {
+            return data as DailyReportNarrative;
+          }
+        } catch (e) {
+          console.warn('Supabase getDailyReportNarrative error:', e);
+        }
+      }
+    }
+
     if (typeof window === 'undefined') return null;
     try {
       const all: DailyReportNarrative[] = JSON.parse(localStorage.getItem(KEY_DAILY_REPORTS) || '[]');
@@ -1094,23 +1126,54 @@ export class DataService {
     }
   }
 
-  static saveDailyReportNarrative(narrative: DailyReportNarrative): void {
-    if (typeof window === 'undefined') return;
-    try {
-      const all: DailyReportNarrative[] = JSON.parse(localStorage.getItem(KEY_DAILY_REPORTS) || '[]');
-      const idx = all.findIndex((r) => r.project_id === narrative.project_id && r.work_date === narrative.work_date);
-      if (idx >= 0) {
-        all[idx] = { ...narrative, updated_at: new Date().toISOString() };
-      } else {
-        all.push({ ...narrative, updated_at: new Date().toISOString() });
+  static async saveDailyReportNarrative(narrative: DailyReportNarrative): Promise<void> {
+    if (typeof window !== 'undefined') {
+      try {
+        const all: DailyReportNarrative[] = JSON.parse(localStorage.getItem(KEY_DAILY_REPORTS) || '[]');
+        const idx = all.findIndex((r) => r.project_id === narrative.project_id && r.work_date === narrative.work_date);
+        const updated = { ...narrative, updated_at: new Date().toISOString() };
+        if (idx >= 0) {
+          all[idx] = updated;
+        } else {
+          all.push(updated);
+        }
+        localStorage.setItem(KEY_DAILY_REPORTS, JSON.stringify(all));
+      } catch (err) {
+        console.error('Error saving narrative local:', err);
       }
-      localStorage.setItem(KEY_DAILY_REPORTS, JSON.stringify(all));
-    } catch (err) {
-      console.error('Error saving daily report narrative:', err);
+    }
+
+    if (isSupabaseConfigured()) {
+      const client = getSupabase();
+      if (client) {
+        try {
+          await client.from('daily_report_narratives').upsert(narrative, { onConflict: 'project_id,work_date' });
+        } catch (e) {
+          console.warn('Supabase saveDailyReportNarrative error:', e);
+        }
+      }
     }
   }
 
-  static getAllDailyReportNarratives(projectId: string): DailyReportNarrative[] {
+  static async getAllDailyReportNarratives(projectId: string): Promise<DailyReportNarrative[]> {
+    if (isSupabaseConfigured()) {
+      const client = getSupabase();
+      if (client) {
+        try {
+          const { data, error } = await client
+            .from('daily_report_narratives')
+            .select('*')
+            .eq('project_id', projectId)
+            .order('work_date', { ascending: false });
+          if (!error && data) {
+            return data as DailyReportNarrative[];
+          }
+        } catch (e) {
+          console.warn('Supabase getAllDailyReportNarratives error:', e);
+        }
+      }
+    }
+
     if (typeof window === 'undefined') return [];
     try {
       const all: DailyReportNarrative[] = JSON.parse(localStorage.getItem(KEY_DAILY_REPORTS) || '[]');
@@ -1120,31 +1183,65 @@ export class DataService {
     }
   }
 
-  static deleteDailyReportNarrative(projectId: string, workDate: string): void {
-    if (typeof window === 'undefined') return;
-    try {
-      const all: DailyReportNarrative[] = JSON.parse(localStorage.getItem(KEY_DAILY_REPORTS) || '[]');
-      const filtered = all.filter((r) => !(r.work_date === workDate && (r.project_id === projectId || !r.project_id || !projectId)));
-      localStorage.setItem(KEY_DAILY_REPORTS, JSON.stringify(filtered));
-    } catch (err) {
-      console.error('Error deleting daily report narrative:', err);
+  static async deleteDailyReportNarrative(projectId: string, workDate: string): Promise<void> {
+    if (typeof window !== 'undefined') {
+      try {
+        const all: DailyReportNarrative[] = JSON.parse(localStorage.getItem(KEY_DAILY_REPORTS) || '[]');
+        const filtered = all.filter((r) => !(r.work_date === workDate && (r.project_id === projectId || !r.project_id || !projectId)));
+        localStorage.setItem(KEY_DAILY_REPORTS, JSON.stringify(filtered));
+      } catch (err) {
+        console.error('Error deleting narrative local:', err);
+      }
+    }
+
+    if (isSupabaseConfigured()) {
+      const client = getSupabase();
+      if (client) {
+        try {
+          await client
+            .from('daily_report_narratives')
+            .delete()
+            .eq('project_id', projectId)
+            .eq('work_date', workDate);
+        } catch (e) {
+          console.warn('Supabase deleteDailyReportNarrative error:', e);
+        }
+      }
     }
   }
 
   // --- REPORT PACKAGES (ARSIP PAKET LAPORAN) ---
-  static getReportPackages(projectId: string): ReportPackage[] {
+  static async getReportPackages(projectId: string): Promise<ReportPackage[]> {
+    if (isSupabaseConfigured()) {
+      const client = getSupabase();
+      if (client) {
+        try {
+          const { data, error } = await client
+            .from('report_packages')
+            .select('*')
+            .eq('project_id', projectId)
+            .order('created_at', { ascending: false });
+          if (!error && data && data.length > 0) {
+            return data as ReportPackage[];
+          }
+        } catch (e) {
+          console.warn('Supabase getReportPackages error:', e);
+        }
+      }
+    }
+
     if (typeof window === 'undefined') return [];
     try {
       const stored = localStorage.getItem(KEY_REPORT_PACKAGES);
       if (stored !== null) {
         const all: ReportPackage[] = JSON.parse(stored);
-        return all.filter((p) => p.project_id === projectId || !p.project_id || !projectId);
+        const filtered = all.filter((p) => p.project_id === projectId || !p.project_id || !projectId);
+        if (filtered.length > 0) return filtered;
       }
     } catch {
       // fallback
     }
 
-    // Default package for this project
     const defaultPackages: ReportPackage[] = [
       {
         id: `pkg-demo-${projectId}`,
@@ -1163,41 +1260,64 @@ export class DataService {
     return defaultPackages;
   }
 
-  static saveReportPackage(pkg: ReportPackage): void {
-    if (typeof window === 'undefined') return;
-    try {
-      let all: ReportPackage[] = [];
-      const stored = localStorage.getItem(KEY_REPORT_PACKAGES);
-      if (stored) {
-        all = JSON.parse(stored);
-      } else {
-        all = this.getReportPackages(pkg.project_id);
+  static async saveReportPackage(pkg: ReportPackage): Promise<void> {
+    if (typeof window !== 'undefined') {
+      try {
+        let all: ReportPackage[] = [];
+        const stored = localStorage.getItem(KEY_REPORT_PACKAGES);
+        if (stored) {
+          all = JSON.parse(stored);
+        } else {
+          all = await this.getReportPackages(pkg.project_id);
+        }
+        const idx = all.findIndex((p) => p.id === pkg.id);
+        if (idx >= 0) {
+          all[idx] = pkg;
+        } else {
+          all.unshift(pkg);
+        }
+        localStorage.setItem(KEY_REPORT_PACKAGES, JSON.stringify(all));
+      } catch (err) {
+        console.error('Error saving package local:', err);
       }
+    }
 
-      const idx = all.findIndex((p) => p.id === pkg.id);
-      if (idx >= 0) {
-        all[idx] = pkg;
-      } else {
-        all.unshift(pkg);
+    if (isSupabaseConfigured()) {
+      const client = getSupabase();
+      if (client) {
+        try {
+          await client.from('report_packages').upsert(pkg, { onConflict: 'id' });
+        } catch (e) {
+          console.warn('Supabase saveReportPackage error:', e);
+        }
       }
-      localStorage.setItem(KEY_REPORT_PACKAGES, JSON.stringify(all));
-    } catch (err) {
-      console.error('Error saving report package:', err);
     }
   }
 
-  static deleteReportPackage(id: string): void {
-    if (typeof window === 'undefined') return;
-    try {
-      let all: ReportPackage[] = [];
-      const stored = localStorage.getItem(KEY_REPORT_PACKAGES);
-      if (stored) {
-        all = JSON.parse(stored);
+  static async deleteReportPackage(id: string): Promise<void> {
+    if (typeof window !== 'undefined') {
+      try {
+        let all: ReportPackage[] = [];
+        const stored = localStorage.getItem(KEY_REPORT_PACKAGES);
+        if (stored) {
+          all = JSON.parse(stored);
+        }
+        all = all.filter((p) => p.id !== id);
+        localStorage.setItem(KEY_REPORT_PACKAGES, JSON.stringify(all));
+      } catch (err) {
+        console.error('Error deleting package local:', err);
       }
-      all = all.filter((p) => p.id !== id);
-      localStorage.setItem(KEY_REPORT_PACKAGES, JSON.stringify(all));
-    } catch (err) {
-      console.error('Error deleting report package:', err);
+    }
+
+    if (isSupabaseConfigured()) {
+      const client = getSupabase();
+      if (client) {
+        try {
+          await client.from('report_packages').delete().eq('id', id);
+        } catch (e) {
+          console.warn('Supabase deleteReportPackage error:', e);
+        }
+      }
     }
   }
 
@@ -1282,7 +1402,26 @@ export class DataService {
   }
 
   // --- DRIVE DOCUMENTATION PHOTOS ---
-  static getDocumentationPhotos(projectId: string, workDate: string): DriveDocumentationPhoto[] {
+  static async getDocumentationPhotos(projectId: string, workDate: string): Promise<DriveDocumentationPhoto[]> {
+    if (isSupabaseConfigured()) {
+      const client = getSupabase();
+      if (client) {
+        try {
+          const { data, error } = await client
+            .from('documentation_photos')
+            .select('*')
+            .eq('project_id', projectId)
+            .eq('work_date', workDate)
+            .order('uploaded_at', { ascending: false });
+          if (!error && data) {
+            return data as DriveDocumentationPhoto[];
+          }
+        } catch (e) {
+          console.warn('Supabase getDocumentationPhotos error:', e);
+        }
+      }
+    }
+
     if (typeof window === 'undefined') return [];
     try {
       const all: DriveDocumentationPhoto[] = JSON.parse(localStorage.getItem(KEY_DRIVE_PHOTOS) || '[]');
@@ -1292,25 +1431,49 @@ export class DataService {
     }
   }
 
-  static saveDocumentationPhoto(photo: DriveDocumentationPhoto): void {
-    if (typeof window === 'undefined') return;
-    try {
-      const all: DriveDocumentationPhoto[] = JSON.parse(localStorage.getItem(KEY_DRIVE_PHOTOS) || '[]');
-      all.unshift(photo);
-      localStorage.setItem(KEY_DRIVE_PHOTOS, JSON.stringify(all));
-    } catch (err) {
-      console.error('Error saving documentation photo:', err);
+  static async saveDocumentationPhoto(photo: DriveDocumentationPhoto): Promise<void> {
+    if (typeof window !== 'undefined') {
+      try {
+        const all: DriveDocumentationPhoto[] = JSON.parse(localStorage.getItem(KEY_DRIVE_PHOTOS) || '[]');
+        all.unshift(photo);
+        localStorage.setItem(KEY_DRIVE_PHOTOS, JSON.stringify(all));
+      } catch (err) {
+        console.error('Error saving photo local:', err);
+      }
+    }
+
+    if (isSupabaseConfigured()) {
+      const client = getSupabase();
+      if (client) {
+        try {
+          await client.from('documentation_photos').upsert(photo, { onConflict: 'id' });
+        } catch (e) {
+          console.warn('Supabase saveDocumentationPhoto error:', e);
+        }
+      }
     }
   }
 
-  static deleteDocumentationPhoto(id: string): void {
-    if (typeof window === 'undefined') return;
-    try {
-      const all: DriveDocumentationPhoto[] = JSON.parse(localStorage.getItem(KEY_DRIVE_PHOTOS) || '[]');
-      const filtered = all.filter((p) => p.id !== id);
-      localStorage.setItem(KEY_DRIVE_PHOTOS, JSON.stringify(filtered));
-    } catch (err) {
-      console.error('Error deleting documentation photo:', err);
+  static async deleteDocumentationPhoto(id: string): Promise<void> {
+    if (typeof window !== 'undefined') {
+      try {
+        const all: DriveDocumentationPhoto[] = JSON.parse(localStorage.getItem(KEY_DRIVE_PHOTOS) || '[]');
+        const filtered = all.filter((p) => p.id !== id);
+        localStorage.setItem(KEY_DRIVE_PHOTOS, JSON.stringify(filtered));
+      } catch (err) {
+        console.error('Error deleting photo local:', err);
+      }
+    }
+
+    if (isSupabaseConfigured()) {
+      const client = getSupabase();
+      if (client) {
+        try {
+          await client.from('documentation_photos').delete().eq('id', id);
+        } catch (e) {
+          console.warn('Supabase deleteDocumentationPhoto error:', e);
+        }
+      }
     }
   }
 

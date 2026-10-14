@@ -79,6 +79,49 @@ CREATE TABLE IF NOT EXISTS public.daily_manpower (
     CONSTRAINT uq_project_role_date UNIQUE (project_id, job_role_id, work_date)
 );
 
+-- 6. DAILY_REPORT_NARRATIVES TABLE (Arsip Laporan Harian)
+CREATE TABLE IF NOT EXISTS public.daily_report_narratives (
+    project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+    work_date DATE NOT NULL,
+    rencana_m6 TEXT,
+    realisasi_m6 TEXT,
+    deviasi_m6 TEXT,
+    pekerjaan TEXT,
+    peralatan TEXT,
+    kendala TEXT,
+    cuaca TEXT,
+    material_masuk TEXT,
+    saran TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+    CONSTRAINT uq_narrative_project_date UNIQUE (project_id, work_date)
+);
+
+-- 7. DOCUMENTATION_PHOTOS TABLE (Foto Dokumentasi Lapangan)
+CREATE TABLE IF NOT EXISTS public.documentation_photos (
+    id TEXT PRIMARY KEY,
+    project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+    work_date DATE NOT NULL,
+    file_name TEXT NOT NULL,
+    file_size INTEGER,
+    mime_type TEXT,
+    google_drive_file_id TEXT,
+    web_view_link TEXT,
+    data_url TEXT,
+    caption TEXT,
+    uploaded_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+-- 8. REPORT_PACKAGES TABLE (Arsip Paket Laporan)
+CREATE TABLE IF NOT EXISTS public.report_packages (
+    id TEXT PRIMARY KEY,
+    project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    start DATE NOT NULL,
+    end DATE NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+
 -- 6. INDEXES FOR HIGH-PERFORMANCE QUERIES
 CREATE INDEX IF NOT EXISTS idx_projects_status ON public.projects(status);
 CREATE INDEX IF NOT EXISTS idx_job_roles_project ON public.job_roles(project_id, sort_order);
@@ -202,6 +245,25 @@ DROP POLICY IF EXISTS "Insert or update daily manpower" ON public.daily_manpower
 DROP POLICY IF EXISTS "Allow all access to daily_manpower" ON public.daily_manpower;
 CREATE POLICY "Allow all access to daily_manpower" ON public.daily_manpower
     FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+-- F. Daily Report Narratives Policies
+ALTER TABLE public.daily_report_narratives ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all access to daily_report_narratives" ON public.daily_report_narratives;
+CREATE POLICY "Allow all access to daily_report_narratives" ON public.daily_report_narratives
+    FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+-- G. Documentation Photos Policies
+ALTER TABLE public.documentation_photos ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all access to documentation_photos" ON public.documentation_photos;
+CREATE POLICY "Allow all access to documentation_photos" ON public.documentation_photos
+    FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+-- H. Report Packages Policies
+ALTER TABLE public.report_packages ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all access to report_packages" ON public.report_packages;
+CREATE POLICY "Allow all access to report_packages" ON public.report_packages
+    FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
 
 -- 11. INITIAL SEED (Demo Project & Standard 8 Roles)
 INSERT INTO public.projects (

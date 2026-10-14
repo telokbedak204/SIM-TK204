@@ -338,8 +338,9 @@ export const DailyReportPage: React.FC<DailyReportPageProps> = ({
 
   useEffect(() => {
     if (!project) return;
-    const loadedPhotos = DataService.getDocumentationPhotos(project.id, selectedDate);
-    setPhotos(loadedPhotos);
+    DataService.getDocumentationPhotos(project.id, selectedDate).then((loadedPhotos) => {
+      setPhotos(loadedPhotos);
+    });
   }, [project, selectedDate]);
 
   const handleGoogleLogin = async () => {
@@ -432,8 +433,9 @@ export const DailyReportPage: React.FC<DailyReportPageProps> = ({
         uploaded_at: new Date().toISOString(),
       };
 
-      DataService.saveDocumentationPhoto(newPhoto);
-      setPhotos(DataService.getDocumentationPhotos(project.id, selectedDate));
+      await DataService.saveDocumentationPhoto(newPhoto);
+      const updatedPhotos = await DataService.getDocumentationPhotos(project.id, selectedDate);
+      setPhotos(updatedPhotos);
       
       // Reset staging state
       setStagedFile(null);
@@ -483,8 +485,9 @@ export const DailyReportPage: React.FC<DailyReportPageProps> = ({
         web_view_link: driveResult.webViewLink,
       };
 
-      DataService.saveDocumentationPhoto(updatedPhoto);
-      setPhotos(DataService.getDocumentationPhotos(project.id, selectedDate));
+      await DataService.saveDocumentationPhoto(updatedPhoto);
+      const updatedPhotos = await DataService.getDocumentationPhotos(project.id, selectedDate);
+      setPhotos(updatedPhotos);
       addToast(
         'success',
         `Foto "${photo.file_name}" telah berhasil diunggah ke Google Drive!`,
@@ -502,9 +505,10 @@ export const DailyReportPage: React.FC<DailyReportPageProps> = ({
     setPhotoToDelete(photoId);
   };
 
-  const confirmDeletePhoto = (photoId: string) => {
-    DataService.deleteDocumentationPhoto(photoId);
-    setPhotos(DataService.getDocumentationPhotos(project.id, selectedDate));
+  const confirmDeletePhoto = async (photoId: string) => {
+    await DataService.deleteDocumentationPhoto(photoId);
+    const updatedPhotos = await DataService.getDocumentationPhotos(project.id, selectedDate);
+    setPhotos(updatedPhotos);
     addToast('info', 'Foto dokumentasi berhasil dihapus.');
     setPhotoToDelete(null);
   };
@@ -514,9 +518,9 @@ export const DailyReportPage: React.FC<DailyReportPageProps> = ({
     setReportToDelete(workDate);
   };
 
-  const confirmDeleteArchivedReport = (workDate: string) => {
-    DataService.deleteDailyReportNarrative(project.id, workDate);
-    const updated = DataService.getAllDailyReportNarratives(project.id);
+  const confirmDeleteArchivedReport = async (workDate: string) => {
+    await DataService.deleteDailyReportNarrative(project.id, workDate);
+    const updated = await DataService.getAllDailyReportNarratives(project.id);
     setAllSavedReports(updated);
     addToast('success', `Laporan harian tanggal ${formatDateIndo(workDate)} berhasil dihapus dari arsip.`);
 
@@ -529,73 +533,84 @@ export const DailyReportPage: React.FC<DailyReportPageProps> = ({
   // Load saved narrative whenever project or selectedDate changes
   useEffect(() => {
     if (!project) return;
-    const existing = DataService.getDailyReportNarrative(project.id, selectedDate);
-    if (existing) {
-      setRencanaM6(existing.rencana_m6 || '1,755%');
-      setRealisasiM6(existing.realisasi_m6 || '3,483%');
-      setDeviasiM6(existing.deviasi_m6 || '1,728%');
-      setPekerjaanText(existing.pekerjaan || '-');
-      setPeralatanText(existing.peralatan || '');
-      setKendalaText(existing.kendala || '-');
-      const loadedCuaca = existing.cuaca || formatWeatherString('Cerah', 'Cerah', 'Cerah', '07:00 - 12:00', '12:00 - 15:00', '15:00 - 17:00');
-      setCuacaText(loadedCuaca);
+    let isMounted = true;
+    (async () => {
+      const existing = await DataService.getDailyReportNarrative(project.id, selectedDate);
+      if (!isMounted) return;
+      if (existing) {
+        setRencanaM6(existing.rencana_m6 || '1,755%');
+        setRealisasiM6(existing.realisasi_m6 || '3,483%');
+        setDeviasiM6(existing.deviasi_m6 || '1,728%');
+        setPekerjaanText(existing.pekerjaan || '-');
+        setPeralatanText(existing.peralatan || '');
+        setKendalaText(existing.kendala || '-');
+        const loadedCuaca = existing.cuaca || formatWeatherString('Cerah', 'Cerah', 'Cerah', '07:00 - 12:00', '12:00 - 15:00', '15:00 - 17:00');
+        setCuacaText(loadedCuaca);
 
-      // Check if structured matching exists
-      const pagiMatch = loadedCuaca.match(/Pagi\s*\(([^)]+)\)\s*:\s*([^\n]+)/i);
-      const siangMatch = loadedCuaca.match(/Siang\s*\(([^)]+)\)\s*:\s*([^\n]+)/i);
-      const soreMatch = loadedCuaca.match(/Sore\s*\(([^)]+)\)\s*:\s*([^\n]+)/i);
-      if (pagiMatch) {
-        setJamPagi(pagiMatch[1].trim());
-        setCuacaPagi(pagiMatch[2].trim());
-      }
-      if (siangMatch) {
-        setJamSiang(siangMatch[1].trim());
-        setCuacaSiang(siangMatch[2].trim());
-      }
-      if (soreMatch) {
-        setJamSore(soreMatch[1].trim());
-        setCuacaSore(soreMatch[2].trim());
-      }
-      setMaterialMasukText(existing.material_masuk || '-');
-      setSaranText(existing.saran || '-');
-    } else {
-      const defaultCuaca = formatWeatherString('Cerah', 'Cerah', 'Cerah', '07:00 - 12:00', '12:00 - 15:00', '15:00 - 17:00');
-      setCuacaPagi('Cerah');
-      setCuacaSiang('Cerah');
-      setCuacaSore('Cerah');
-      setJamPagi('07:00 - 12:00');
-      setJamSiang('12:00 - 15:00');
-      setJamSore('15:00 - 17:00');
-      setCuacaText(defaultCuaca);
-
-      if (selectedDate === '2026-10-11') {
-        setRencanaM6('1,755%');
-        setRealisasiM6('3,483%');
-        setDeviasiM6('1,728%');
-        setPekerjaanText('-');
-        setPeralatanText('');
-        setSelectedEquipmentIds([]);
-        setKendalaText('- material utama belum ada');
-        setMaterialMasukText('- saat ini belum ada material masuk');
-        setSaranText('- Di tambah dudukan alas pijakan, agar pekerja lebih aman\n- lakukan mapping pekerjaan');
+        // Check if structured matching exists
+        const pagiMatch = loadedCuaca.match(/Pagi\s*\(([^)]+)\)\s*:\s*([^\n]+)/i);
+        const siangMatch = loadedCuaca.match(/Siang\s*\(([^)]+)\)\s*:\s*([^\n]+)/i);
+        const soreMatch = loadedCuaca.match(/Sore\s*\(([^)]+)\)\s*:\s*([^\n]+)/i);
+        if (pagiMatch) {
+          setJamPagi(pagiMatch[1].trim());
+          setCuacaPagi(pagiMatch[2].trim());
+        }
+        if (siangMatch) {
+          setJamSiang(siangMatch[1].trim());
+          setCuacaSiang(siangMatch[2].trim());
+        }
+        if (soreMatch) {
+          setJamSore(soreMatch[1].trim());
+          setCuacaSore(soreMatch[2].trim());
+        }
+        setMaterialMasukText(existing.material_masuk || '-');
+        setSaranText(existing.saran || '-');
       } else {
-        setRencanaM6('1,500%');
-        setRealisasiM6('1,500%');
-        setDeviasiM6('0,000%');
-        setPekerjaanText('- Pekerjaan persiapan & struktur konstruksi');
-        setPeralatanText('');
-        setSelectedEquipmentIds([]);
-        setKendalaText('- Nihil');
-        setMaterialMasukText('- Belum ada');
-        setSaranText('- Utamakan K3 dan kebersihan area kerja');
+        const defaultCuaca = formatWeatherString('Cerah', 'Cerah', 'Cerah', '07:00 - 12:00', '12:00 - 15:00', '15:00 - 17:00');
+        setCuacaPagi('Cerah');
+        setCuacaSiang('Cerah');
+        setCuacaSore('Cerah');
+        setJamPagi('07:00 - 12:00');
+        setJamSiang('12:00 - 15:00');
+        setJamSore('15:00 - 17:00');
+        setCuacaText(defaultCuaca);
+
+        if (selectedDate === '2026-10-11') {
+          setRencanaM6('1,755%');
+          setRealisasiM6('3,483%');
+          setDeviasiM6('1,728%');
+          setPekerjaanText('-');
+          setPeralatanText('');
+          setSelectedEquipmentIds([]);
+          setKendalaText('- material utama belum ada');
+          setMaterialMasukText('- saat ini belum ada material masuk');
+          setSaranText('- Di tambah dudukan alas pijakan, agar pekerja lebih aman\n- lakukan mapping pekerjaan');
+        } else {
+          setRencanaM6('1,500%');
+          setRealisasiM6('1,500%');
+          setDeviasiM6('0,000%');
+          setPekerjaanText('- Pekerjaan persiapan & struktur konstruksi');
+          setPeralatanText('');
+          setSelectedEquipmentIds([]);
+          setKendalaText('- Nihil');
+          setMaterialMasukText('- Belum ada');
+          setSaranText('- Utamakan K3 dan kebersihan area kerja');
+        }
       }
-    }
-    // Load all reports for history list
-    setAllSavedReports(DataService.getAllDailyReportNarratives(project.id));
+      // Load all reports for history list
+      const allReports = await DataService.getAllDailyReportNarratives(project.id);
+      if (isMounted) {
+        setAllSavedReports(allReports);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
   }, [project, selectedDate]);
 
   // Handle explicit Save
-  const handleSaveReport = () => {
+  const handleSaveReport = async () => {
     if (!project) return;
     const narrative: DailyReportNarrative = {
       project_id: project.id,
@@ -611,9 +626,10 @@ export const DailyReportPage: React.FC<DailyReportPageProps> = ({
       saran: saranText,
       updated_at: new Date().toISOString(),
     };
-    DataService.saveDailyReportNarrative(narrative);
-    setAllSavedReports(DataService.getAllDailyReportNarratives(project.id));
-    addToast('success', `Laporan harian tanggal ${formatDateIndo(selectedDate)} berhasil disimpan ke Arsip & LocalStorage!`, 'Penyimpanan Berhasil');
+    await DataService.saveDailyReportNarrative(narrative);
+    const updatedReports = await DataService.getAllDailyReportNarratives(project.id);
+    setAllSavedReports(updatedReports);
+    addToast('success', `Laporan harian tanggal ${formatDateIndo(selectedDate)} berhasil disimpan ke Cloud Database & Arsip!`, 'Penyimpanan Berhasil');
   };
 
   // Active roles
@@ -676,7 +692,7 @@ ${consultantName}`;
     setTimeout(() => setCopied(false), 3000);
   };
 
-  const handleExportPDF = (targetNarrative?: DailyReportNarrative, targetDate?: string) => {
+  const handleExportPDF = async (targetNarrative?: DailyReportNarrative, targetDate?: string) => {
     setIsExportingPDF(true);
     try {
       const activeDate = targetDate || selectedDate;
@@ -696,7 +712,7 @@ ${consultantName}`;
       };
 
       const docPhotos = targetDate && targetDate !== selectedDate
-        ? DataService.getDocumentationPhotos(project.id, targetDate)
+        ? await DataService.getDocumentationPhotos(project.id, targetDate)
         : photos;
 
       const fileName = exportDailyReportToPDF({
