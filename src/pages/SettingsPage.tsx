@@ -746,7 +746,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <span>Putuskan Sambungan</span>
               </button>
             ) : (
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={handleGoogleLogin}
@@ -755,6 +755,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 >
                   <Upload className="w-3.5 h-3.5" />
                   <span>{isGoogleLoading ? 'Menghubungkan...' : 'Hubungkan Akun Google'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSimulateGoogleLogin}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors shadow-xs min-h-[40px] w-full justify-center cursor-pointer whitespace-nowrap"
+                  title="Gunakan ini jika domain preview belum terdaftar di Firebase Authorized Domains"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Mode Simulasi (Bypass Domain)</span>
                 </button>
               </div>
             )}
