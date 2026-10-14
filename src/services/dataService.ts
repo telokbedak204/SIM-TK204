@@ -459,15 +459,30 @@ export class DataService {
       }
 
       if (narratives.length > 0) {
-        await client.from('daily_report_narratives').upsert(narratives, { onConflict: 'project_id,work_date' });
+        console.log('Pushing narratives to Supabase:', narratives);
+        const { error: narrErr } = await client.from('daily_report_narratives').upsert(narratives, { onConflict: 'project_id,work_date' });
+        if (narrErr) {
+            console.error('Error pushing narratives to Supabase:', narrErr);
+            throw new Error(`Tabel daily_report_narratives: ${narrErr.message}`);
+        }
       }
 
       if (photos.length > 0) {
-        await client.from('documentation_photos').upsert(photos, { onConflict: 'id' });
+        console.log('Pushing photos to Supabase:', photos);
+        const { error: photoErr } = await client.from('documentation_photos').upsert(photos, { onConflict: 'id' });
+        if (photoErr) {
+            console.error('Error pushing photos to Supabase:', photoErr);
+            throw new Error(`Tabel documentation_photos: ${photoErr.message}`);
+        }
       }
 
       if (packages.length > 0) {
-        await client.from('report_packages').upsert(packages, { onConflict: 'id' });
+        console.log('Pushing packages to Supabase:', packages);
+        const { error: pkgErr } = await client.from('report_packages').upsert(packages, { onConflict: 'id' });
+        if (pkgErr) {
+            console.error('Error pushing packages to Supabase:', pkgErr);
+            throw new Error(`Tabel report_packages: ${pkgErr.message}`);
+        }
       }
 
       return {
@@ -475,6 +490,7 @@ export class DataService {
         message: `Sinkronisasi berhasil! ${projects.length} Proyek, ${roles.length} Jabatan, ${manpower.length} Manpower, ${narratives.length} Laporan Harian, dan ${photos.length} Foto berhasil disimpan ke Supabase PostgreSQL.`,
       };
     } catch (err) {
+      console.error('Error in pushLocalDataToSupabase:', err);
       const errMsg = (err as Error).message;
       return {
         success: false,
@@ -1165,13 +1181,21 @@ export class DataService {
             .select('*')
             .eq('project_id', projectId)
             .order('work_date', { ascending: false });
-          if (!error && data) {
+          
+          if (error) {
+            console.error('Supabase getAllDailyReportNarratives error:', error);
+          } else {
+            console.log('Supabase getAllDailyReportNarratives data:', data);
             return data as DailyReportNarrative[];
           }
         } catch (e) {
-          console.warn('Supabase getAllDailyReportNarratives error:', e);
+          console.warn('Supabase getAllDailyReportNarratives catch error:', e);
         }
+      } else {
+        console.warn('Supabase client is null in getAllDailyReportNarratives');
       }
+    } else {
+      console.warn('Supabase is not configured in getAllDailyReportNarratives');
     }
 
     if (typeof window === 'undefined') return [];
