@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Project, JobRole, DailyManpower, DailyReportNarrative, DriveDocumentationPhoto, UserProfile } from '../types';
 import { DataService } from '../services/dataService';
-import { formatDateIndo, getDayNameIndo, formatDateIndoFull } from '../lib/calculations';
+import { formatDateIndo, getDayNameIndo, formatDateIndoFull, getWeekLabel } from '../lib/calculations';
 import { initGoogleAuth, googleSignIn, getAccessToken, uploadPhotoToGoogleDrive, dataUrlToBlob, hasRealGoogleConnection, isSuperAdminUser, syncGoogleDriveConfigFromServer } from '../lib/googleDriveAuth';
 import {
   FileText,
@@ -633,6 +633,7 @@ export const DailyReportPage: React.FC<DailyReportPageProps> = ({
   const dateFull = formatDateIndoFull(selectedDate);
   const spmkDate = project.spmk_date ? formatDateIndoFull(project.spmk_date) : (project.start_date ? formatDateIndoFull(project.start_date) : '28 Agustus 2026');
   const consultantName = project.consultant_name || 'PT. Arcansia Dwitama Konsultan KSO PT. Teknik Eksakta';
+  const currentWeekLabel = getWeekLabel(selectedDate, project?.start_date || project?.spmk_date);
 
   const fullReportText = `${project.name}
 ----------------------------------------
@@ -640,9 +641,9 @@ Hari, Tanggal : ${dayName}, ${dateFull}
 ----------------------------------------
 Mulai kerja berdasarkan SPMK = ${spmkDate}
 -----------------------------------------
-Rencana M6  : ${rencanaM6}
-Realisasi M6 : ${realisasiM6}
-Deviasi  M6    :  ${deviasiM6}
+Rencana ${currentWeekLabel}  : ${rencanaM6}
+Realisasi ${currentWeekLabel} : ${realisasiM6}
+Deviasi  ${currentWeekLabel}    :  ${deviasiM6}
 
 A. Pekerjaan
 ${pekerjaanText}
@@ -731,15 +732,17 @@ ${consultantName}`;
       return `- ${role.name} = ${cnt} orang`;
     }).join('\n');
 
+    const repWeekLabel = getWeekLabel(rep.work_date, project.start_date || project.spmk_date);
+
     return `${project.name}
 ----------------------------------------
 Hari, Tanggal : ${dName}, ${dFull}
 ----------------------------------------
 Mulai kerja berdasarkan SPMK = ${sDate}
 -----------------------------------------
-Rencana M6  : ${rep.rencana_m6 || '1,755%'}
-Realisasi M6 : ${rep.realisasi_m6 || '3,483%'}
-Deviasi  M6    :  ${rep.deviasi_m6 || '1,728%'}
+Rencana ${repWeekLabel}  : ${rep.rencana_m6 || '1,755%'}
+Realisasi ${repWeekLabel} : ${rep.realisasi_m6 || '3,483%'}
+Deviasi  ${repWeekLabel}    :  ${rep.deviasi_m6 || '1,728%'}
 
 A. Pekerjaan
 ${rep.pekerjaan || '-'}
@@ -823,7 +826,7 @@ ${consultantName}`;
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Rencana M6</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Rencana {currentWeekLabel}</label>
               <input
                 type="text"
                 value={rencanaM6}
@@ -832,7 +835,7 @@ ${consultantName}`;
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Realisasi M6</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Realisasi {currentWeekLabel}</label>
               <input
                 type="text"
                 value={realisasiM6}
@@ -841,7 +844,7 @@ ${consultantName}`;
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Deviasi M6</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Deviasi {currentWeekLabel}</label>
               <input
                 type="text"
                 value={deviasiM6}

@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable, { RowInput } from 'jspdf-autotable';
 import { Project, MatrixSummary, DailyManpower, JobRole, DriveDocumentationPhoto } from '../types';
-import { formatDateIndo, getDayNameIndo, formatDateIndoFull, INDONESIAN_MONTH_NAMES_FULL } from './calculations';
+import { formatDateIndo, getDayNameIndo, formatDateIndoFull, INDONESIAN_MONTH_NAMES_FULL, getWeekLabel } from './calculations';
 
 /**
  * Builds the complete jsPDF document instance for SIM-TK204 Weekly/Period Monitoring.
@@ -611,10 +611,11 @@ export function generateDailyReportPDFDoc(params: DailyReportPDFParams): jsPDF {
   const recordsForDate = dailyRecords.filter((r) => r.work_date === selectedDate);
   const totalWorkers = recordsForDate.reduce((acc, r) => acc + (Number(r.worker_count) || 0), 0);
 
+  const pdfWeekLabel = getWeekLabel(selectedDate, project.start_date || project.spmk_date);
   const kpiItems = [
-    { label: 'RENCANA M6', value: narrative.rencana_m6 || '1,755%', color: [20, 43, 74] },
-    { label: 'REALISASI M6', value: narrative.realisasi_m6 || '3,483%', color: [16, 149, 103] },
-    { label: 'DEVIASI M6', value: narrative.deviasi_m6 || '+1,728%', color: [242, 140, 40] },
+    { label: `RENCANA ${pdfWeekLabel}`, value: narrative.rencana_m6 || '1,755%', color: [20, 43, 74] },
+    { label: `REALISASI ${pdfWeekLabel}`, value: narrative.realisasi_m6 || '3,483%', color: [16, 149, 103] },
+    { label: `DEVIASI ${pdfWeekLabel}`, value: narrative.deviasi_m6 || '+1,728%', color: [242, 140, 40] },
     { label: 'TENAGA KERJA', value: `${totalWorkers} Org`, color: [30, 41, 59] },
   ];
 

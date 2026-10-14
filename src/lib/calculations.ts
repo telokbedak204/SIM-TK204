@@ -212,3 +212,18 @@ export function computeWeeklyMatrix(
     missingDates,
   };
 }
+
+export function getWeekLabel(dateStr: string, startDateStr?: string): string {
+  try {
+    const start = new Date(startDateStr || '2026-08-28');
+    const current = new Date(dateStr);
+    const diffTime = current.getTime() - start.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) return 'M1';
+    const weekNum = Math.floor(diffDays / 7) + 1;
+    return `M${weekNum}`;
+  } catch {
+    return 'M1';
+  }
+}
+
