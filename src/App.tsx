@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Project, JobRole, DailyManpower, UserProfile, UserRole, AppNotification } from './types';
-import { DataService, DEMO_PROJECT_ID } from './services/dataService';
+import { DataService, DEMO_PROJECT_ID, DEFAULT_USER } from './services/dataService';
 import { computeWeeklyMatrix } from './lib/calculations';
-import { isSupabaseConfigured } from './lib/supabase';
+import { isSupabaseConfigured, syncSupabaseConfigFromServer } from './lib/supabase';
 import { exportWeeklyMonitoringToExcel } from './lib/excelExport';
 import { exportWeeklyMonitoringToPDF } from './lib/pdfExport';
+import { syncGoogleDriveConfigFromServer } from './lib/googleDriveAuth';
 
 // Layout Components
 import { Navbar } from './components/layout/Navbar';
@@ -36,12 +37,14 @@ export default function App() {
   const [jobRoles, setJobRoles] = useState<JobRole[]>([]);
   const [dailyRecords, setDailyRecords] = useState<DailyManpower[]>([]);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(DataService.getCurrentUser());
+  const effectiveUser: UserProfile = currentUser || DEFAULT_USER;
   const [isSupabaseOnline, setIsSupabaseOnline] = useState<boolean>(false);
 
-  // Period Filters: Default to Demo Period (2026-10-02 to 2026-10-08)
-  const [startDateStr, setStartDateStr] = useState<string>('2026-10-02');
-  const [endDateStr, setEndDateStr] = useState<string>('2026-10-08');
-  const [selectedDailyDate, setSelectedDailyDate] = useState<string>('2026-10-02');
+  // Period: Mulai Kontrak Proyek hingga Tanggal Saat Ini
+  const getTodayStr = () => new Date().toISOString().split('T')[0];
+  const [startDateStr, setStartDateStr] = useState<string>('2026-08-28');
+  const [endDateStr, setEndDateStr] = useState<string>(getTodayStr());
+  const [selectedDailyDate, setSelectedDailyDate] = useState<string>(getTodayStr());
 
   // Authentication & Session
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(!!DataService.isLoggedIn());
@@ -103,6 +106,13 @@ export default function App() {
       setActiveProject(active);
 
       if (active) {
+        if (active.start_date) {
+          setStartDateStr(active.start_date);
+        }
+        const todayStr = getTodayStr();
+        setEndDateStr(todayStr);
+        setSelectedDailyDate(todayStr);
+
         const roles = await DataService.getJobRoles(active.id);
         setJobRoles(roles);
 
@@ -119,6 +129,12 @@ export default function App() {
   }, [addToast]);
 
   useEffect(() => {
+    syncSupabaseConfigFromServer().then((cfg) => {
+      if (cfg) {
+        setIsSupabaseOnline(isSupabaseConfigured());
+      }
+    });
+    syncGoogleDriveConfigFromServer();
     loadData();
   }, [loadData]);
 
@@ -133,6 +149,12 @@ export default function App() {
     const prj = projects.find((p) => p.id === projectId);
     if (prj) {
       setActiveProject(prj);
+      if (prj.start_date) {
+        setStartDateStr(prj.start_date);
+      }
+      const todayStr = getTodayStr();
+      setEndDateStr(todayStr);
+      setSelectedDailyDate(todayStr);
       const roles = await DataService.getJobRoles(prj.id);
       setJobRoles(roles);
       const records = await DataService.getDailyManpower(prj.id);
@@ -144,7 +166,7 @@ export default function App() {
   const handleRoleChange = (newRole: UserRole) => {
     // Only admins can change roles, and only in a real auth context.
     // In production this should be a protected server-side action.
-    if (currentUser.role !== 'admin') {
+    if (effectiveUser.role !== 'admin') {
       addToast('error', 'Akses ditolak: Hanya Administrator yang berhak mengatur role.');
       return;
     }
@@ -320,7 +342,7 @@ export default function App() {
         projects={projects}
         onSelectProject={handleSelectProject}
         isSupabaseOnline={isSupabaseOnline}
-        currentUser={currentUser}
+        currentUser={effectiveUser}
         onRoleChange={handleRoleChange}
         onOpenSettings={() => setCurrentTab('settings')}
         onOpenShare={() => setIsShareModalOpen(true)}
@@ -341,7 +363,7 @@ export default function App() {
           onOpenShare={() => setIsShareModalOpen(true)}
           onLogout={handleLogout}
           onOpenLogin={() => setIsLoginModalOpen(true)}
-          currentUserRole={currentUser.role}
+          currentUserRole={effectiveUser.role}
         />
 
         {/* Content Area */}
@@ -372,7 +394,7 @@ export default function App() {
                 jobRoles={jobRoles}
                 dailyRecords={dailyRecords}
                 selectedDate={selectedDailyDate}
-                currentUser={currentUser}
+                currentUser={effectiveUser}
                 onDateChange={(d) => setSelectedDailyDate(d)}
                 onSaveBatch={handleSaveBatch}
               />
@@ -386,6 +408,7 @@ export default function App() {
                 selectedDate={selectedDailyDate}
                 onDateChange={(d) => setSelectedDailyDate(d)}
                 addToast={addToast}
+                currentUser={effectiveUser}
               />
             )}
 
@@ -409,7 +432,7 @@ export default function App() {
                 onSaveProject={handleSaveProject}
                 onArchiveProject={handleArchiveProject}
                 onDeleteProject={handleDeleteProject}
-                currentUser={currentUser}
+                currentUser={effectiveUser}
               />
             )}
 
@@ -419,7 +442,7 @@ export default function App() {
                 jobRoles={jobRoles}
                 onSaveRole={handleSaveJobRole}
                 onToggleRoleActive={handleToggleRoleActive}
-                currentUser={currentUser}
+                currentUser={effectiveUser}
               />
             )}
 
@@ -459,7 +482,7 @@ export default function App() {
 
             {currentTab === 'user_roles' && (
               <UserRolesPage
-                currentUser={currentUser}
+                currentUser={effectiveUser}
                 onRoleChange={handleRoleChange}
                 addToast={addToast}
                 onUpdateCurrentUser={(updated) => {
@@ -473,7 +496,7 @@ export default function App() {
 
             {currentTab === 'settings' && (
               <SettingsPage
-                currentUser={currentUser}
+                currentUser={effectiveUser}
                 onRefreshData={loadData}
                 onNavigateToProjects={() => setCurrentTab('projects')}
                 onNavigateToUserRoles={() => setCurrentTab('user_roles')}

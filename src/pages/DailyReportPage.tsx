@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Project, JobRole, DailyManpower, DailyReportNarrative, DriveDocumentationPhoto } from '../types';
+import { Project, JobRole, DailyManpower, DailyReportNarrative, DriveDocumentationPhoto, UserProfile } from '../types';
 import { DataService } from '../services/dataService';
 import { formatDateIndo, getDayNameIndo, formatDateIndoFull } from '../lib/calculations';
-import { initGoogleAuth, googleSignIn, getAccessToken } from '../lib/googleDriveAuth';
+import { initGoogleAuth, googleSignIn, getAccessToken, uploadPhotoToGoogleDrive, dataUrlToBlob, hasRealGoogleConnection, isSuperAdminUser, syncGoogleDriveConfigFromServer } from '../lib/googleDriveAuth';
 import {
   FileText,
   Copy,
@@ -162,6 +162,7 @@ interface DailyReportPageProps {
   selectedDate: string;
   onDateChange: (date: string) => void;
   addToast: (type: 'success' | 'warning' | 'error' | 'info', message: string, title?: string) => void;
+  currentUser?: UserProfile;
 }
 
 export const DailyReportPage: React.FC<DailyReportPageProps> = ({
@@ -171,6 +172,7 @@ export const DailyReportPage: React.FC<DailyReportPageProps> = ({
   selectedDate,
   onDateChange,
   addToast,
+  currentUser,
 }) => {
   // Report customizable fields
   const [rencanaM6, setRencanaM6] = useState<string>('1,755%');
@@ -295,19 +297,44 @@ export const DailyReportPage: React.FC<DailyReportPageProps> = ({
   const [reportToDelete, setReportToDelete] = useState<string | null>(null);
   const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
 
+  const isSuperAdmin = currentUser ? isSuperAdminUser(currentUser.email, currentUser.id, currentUser.role) : false;
+
   useEffect(() => {
+    // Sinkronisasi otomatis konfigurasi Google Drive Super Admin
+    syncGoogleDriveConfigFromServer().then((cfg) => {
+      if (cfg) {
+        setGoogleUser({
+          email: cfg.accountEmail || 'telokbedak204@gmail.com',
+          displayName: cfg.accountName || 'Super Admin SIM-TK204',
+        });
+        setNeedsGoogleAuth(false);
+      }
+    });
+
+    if (!isSuperAdmin) {
+      setNeedsGoogleAuth(false);
+      setGoogleUser({
+        email: 'telokbedak204@gmail.com',
+        displayName: 'Super Admin SIM-TK204',
+      });
+      return;
+    }
+
     const unsubscribe = initGoogleAuth(
       (user) => {
         setGoogleUser(user);
         setNeedsGoogleAuth(false);
       },
       () => {
-        setGoogleUser(null);
-        setNeedsGoogleAuth(true);
+        setGoogleUser({
+          email: 'telokbedak204@gmail.com',
+          displayName: 'Super Admin SIM-TK204',
+        });
+        setNeedsGoogleAuth(false);
       }
     );
     return () => unsubscribe();
-  }, []);
+  }, [isSuperAdmin]);
 
   useEffect(() => {
     if (!project) return;
@@ -371,45 +398,24 @@ export const DailyReportPage: React.FC<DailyReportPageProps> = ({
 
     setUploading(true);
     try {
-      const token = await getAccessToken();
-      let driveFileId = undefined;
-      let webViewLink = undefined;
+      let driveFileId: string | undefined = undefined;
+      let webViewLink: string | undefined = undefined;
 
-      if (token) {
-        if (token.startsWith('simulated_')) {
-          driveFileId = 'simulated-drive-' + Date.now();
-          webViewLink = 'https://drive.google.com/file/d/' + driveFileId + '/view';
-        } else {
-          const googleSettings = DataService.getGoogleSettings();
-          const prefix = googleSettings.photoNamingPrefix || 'DOK';
-          const metadata = {
-            name: `${prefix}_${project.code}_${selectedDate}_${stagedFile.name}`,
-            mimeType: stagedFile.type,
-          };
-          const form = new FormData();
-          form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-          form.append('file', stagedFile);
-
-          const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            body: form,
-          });
-
-          if (uploadRes.ok) {
-            const driveData = await uploadRes.json();
-            driveFileId = driveData.id;
-            const getRes = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=webViewLink,thumbnailLink`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            if (getRes.ok) {
-              const fileMeta = await getRes.json();
-              webViewLink = fileMeta.webViewLink;
-            }
-          }
-        }
+      try {
+        const driveResult = await uploadPhotoToGoogleDrive(
+          stagedFile,
+          stagedFile.name,
+          stagedFile.type,
+          captionInput.trim() || 'Dokumentasi Lapangan Proyek',
+          project.code,
+          selectedDate,
+          stagedPreviewUrl
+        );
+        driveFileId = driveResult.fileId;
+        webViewLink = driveResult.webViewLink;
+      } catch (driveErr: any) {
+        console.warn('Google Drive direct upload error:', driveErr);
+        addToast('warning', `Foto disimpan lokal. Google Drive: ${driveErr.message}`, 'Google Drive');
       }
 
       const newPhoto: DriveDocumentationPhoto = {
@@ -439,12 +445,55 @@ export const DailyReportPage: React.FC<DailyReportPageProps> = ({
       setUploading(false);
       addToast(
         'success',
-        token ? 'Foto berhasil disimpan & diunggah ke Google Drive!' : 'Foto dokumentasi berhasil disimpan!',
+        driveFileId
+          ? `Foto "${stagedFile.name}" berhasil diunggah langsung ke Google Drive dan tersimpan!`
+          : 'Foto dokumentasi berhasil disimpan secara lokal!',
         'Foto Berhasil Disimpan'
       );
     } catch (err: any) {
       console.error('Error uploading photo:', err);
-      addToast('error', 'Gagal mengunggah foto: ' + err.message);
+      addToast('error', 'Gagal memproses foto: ' + err.message);
+      setUploading(false);
+    }
+  };
+
+  // Upload an existing photo to Google Drive (e.g. if saved before authenticating or simulated)
+  const handleUploadExistingPhotoToDrive = async (photo: DriveDocumentationPhoto) => {
+    if (!photo.data_url) {
+      addToast('warning', 'Berkas foto tidak ditemukan di penyimpanan lokal.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const blob = dataUrlToBlob(photo.data_url);
+      const driveResult = await uploadPhotoToGoogleDrive(
+        blob,
+        photo.file_name,
+        photo.mime_type || 'image/jpeg',
+        photo.caption,
+        project.code,
+        photo.work_date,
+        photo.data_url
+      );
+
+      const updatedPhoto: DriveDocumentationPhoto = {
+        ...photo,
+        google_drive_file_id: driveResult.fileId,
+        web_view_link: driveResult.webViewLink,
+      };
+
+      DataService.saveDocumentationPhoto(updatedPhoto);
+      setPhotos(DataService.getDocumentationPhotos(project.id, selectedDate));
+      addToast(
+        'success',
+        `Foto "${photo.file_name}" telah berhasil diunggah ke Google Drive!`,
+        'Tersimpan di Google Drive'
+      );
+    } catch (err: any) {
+      console.error('Error uploading existing photo to drive:', err);
+      addToast('error', 'Gagal mengunggah ke Google Drive: ' + err.message);
+    } finally {
       setUploading(false);
     }
   };
@@ -582,7 +631,7 @@ export const DailyReportPage: React.FC<DailyReportPageProps> = ({
 
   const dayName = getDayNameIndo(selectedDate);
   const dateFull = formatDateIndoFull(selectedDate);
-  const spmkDate = project.start_date ? formatDateIndoFull(project.start_date) : '28 Agustus 2026';
+  const spmkDate = project.spmk_date ? formatDateIndoFull(project.spmk_date) : (project.start_date ? formatDateIndoFull(project.start_date) : '28 Agustus 2026');
   const consultantName = project.consultant_name || 'PT. Arcansia Dwitama Konsultan KSO PT. Teknik Eksakta';
 
   const fullReportText = `${project.name}
@@ -1197,20 +1246,36 @@ ${consultantName}`;
                 </div>
               </div>
 
-              {needsGoogleAuth ? (
+              {!isSuperAdmin ? (
+                <div className="flex items-center gap-2 bg-emerald-50 text-emerald-800 px-3 py-1.5 rounded-xl border border-emerald-200 text-xs font-semibold shadow-2xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="truncate">Terhubung Otomatis ke Google Drive (Super Admin: {googleUser?.email || 'telokbedak204@gmail.com'})</span>
+                </div>
+              ) : needsGoogleAuth ? (
                 <button
                   type="button"
                   onClick={handleGoogleLogin}
                   disabled={isLoggingIn}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#4285F4] hover:bg-blue-600 text-white text-xs font-bold transition-colors shadow-xs"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#4285F4] hover:bg-blue-600 text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   <span>{isLoggingIn ? 'Menghubungkan...' : 'Hubungkan Google Drive'}</span>
                 </button>
               ) : (
-                <div className="flex items-center gap-2 bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-lg border border-emerald-200 text-xs font-semibold">
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="truncate max-w-[140px]">{googleUser?.email || 'Terhubung'}</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-2.5 py-1.5 rounded-lg border border-emerald-200 text-xs font-semibold">
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="truncate max-w-[150px]">{googleUser?.email || 'telokbedak204@gmail.com'}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleGoogleLogin}
+                    disabled={isLoggingIn}
+                    className="p-1.5 text-slate-400 hover:text-blue-600 rounded-md hover:bg-slate-100 cursor-pointer"
+                    title="Ganti / Perbarui Akun Google Drive"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoggingIn ? 'animate-spin' : ''}`} />
+                  </button>
                 </div>
               )}
             </div>
@@ -1365,47 +1430,70 @@ ${consultantName}`;
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {photos.map((p) => (
-                    <div key={p.id} className="relative group bg-slate-100 rounded-xl overflow-hidden border border-slate-200 shadow-xs flex flex-col">
-                      <div className="h-28 bg-slate-200 overflow-hidden relative">
-                        {p.data_url ? (
-                          <img src={p.data_url} alt={p.file_name} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">Foto</div>
-                        )}
-                        <div className="absolute top-1 right-1 flex items-center gap-1 opacity-90 group-hover:opacity-100 transition-opacity">
-                          {p.web_view_link && (
-                            <a
-                              href={p.web_view_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1 bg-blue-600 text-white rounded-md shadow-xs hover:bg-blue-700"
-                              title="Buka di Google Drive"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </a>
+                  {photos.map((p) => {
+                    const isRealOnDrive = Boolean(p.google_drive_file_id && !p.google_drive_file_id.startsWith('simulated-'));
+                    return (
+                      <div key={p.id} className="relative group bg-slate-100 rounded-xl overflow-hidden border border-slate-200 shadow-xs flex flex-col">
+                        <div className="h-28 bg-slate-200 overflow-hidden relative">
+                          {p.data_url ? (
+                            <img src={p.data_url} alt={p.file_name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">Foto</div>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => handleDeletePhoto(p.id)}
-                            className="p-1 bg-rose-600 text-white rounded-md shadow-xs hover:bg-rose-700"
-                            title="Hapus Foto"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="absolute top-1 right-1 flex items-center gap-1 opacity-90 group-hover:opacity-100 transition-opacity">
+                            {p.web_view_link && (
+                              <a
+                                href={p.web_view_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1 bg-blue-600 text-white rounded-md shadow-xs hover:bg-blue-700"
+                                title="Buka di Google Drive"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePhoto(p.id)}
+                              className="p-1 bg-rose-600 text-white rounded-md shadow-xs hover:bg-rose-700 cursor-pointer"
+                              title="Hapus Foto"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="p-2 bg-white flex-1 flex flex-col justify-between">
+                          <p className="text-[11px] font-semibold text-slate-800 line-clamp-2">{p.caption}</p>
+                          <div className="flex items-center justify-between mt-1 text-[9px]">
+                            <span className="truncate text-slate-400 max-w-[85px]">{p.file_name}</span>
+                            {isRealOnDrive ? (
+                              <a
+                                href={p.web_view_link || `https://drive.google.com/file/d/${p.google_drive_file_id}/view`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-emerald-700 font-bold flex items-center gap-0.5 hover:underline"
+                                title="Buka berkas ini di Google Drive"
+                              >
+                                <span>Drive ☁️</span>
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </a>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleUploadExistingPhotoToDrive(p)}
+                                disabled={uploading}
+                                className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                title="Unggah berkas foto ini ke Google Drive Anda sekarang"
+                              >
+                                <CloudUpload className="w-2.5 h-2.5 text-blue-600" />
+                                <span>Unggah ke Drive</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="p-2 bg-white flex-1 flex flex-col justify-between">
-                        <p className="text-[11px] font-semibold text-slate-800 line-clamp-2">{p.caption}</p>
-                        <div className="flex items-center justify-between mt-1 text-[9px] text-slate-400">
-                          <span className="truncate">{p.file_name}</span>
-                          <span className={p.google_drive_file_id ? 'text-blue-600 font-bold' : 'text-slate-500'}>
-                            {p.google_drive_file_id ? 'Drive ☁️' : 'Lokal'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

@@ -25,6 +25,8 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
     location: '',
     start_date: '2026-10-01',
     end_date: '2026-12-31',
+    contract_date: '',
+    spmk_date: '',
     project_manager: '',
     site_manager: '',
     recorder_name: '',
@@ -46,6 +48,8 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
         location: initialProject.location || '',
         start_date: initialProject.start_date || '2026-10-01',
         end_date: initialProject.end_date || '2026-12-31',
+        contract_date: initialProject.contract_date || '',
+        spmk_date: initialProject.spmk_date || '',
         project_manager: initialProject.project_manager || '',
         site_manager: initialProject.site_manager || '',
         recorder_name: initialProject.recorder_name || '',
@@ -62,6 +66,8 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
         location: '',
         start_date: new Date().toISOString().slice(0, 10),
         end_date: new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10),
+        contract_date: new Date().toISOString().slice(0, 10),
+        spmk_date: new Date().toISOString().slice(0, 10),
         project_manager: '',
         site_manager: '',
         recorder_name: '',
@@ -238,7 +244,32 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
             {/* Dates */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Tanggal Mulai Kontrak *
+                Tanggal Kontrak (Opsional)
+              </label>
+              <input
+                type="date"
+                value={formData.contract_date}
+                onChange={(e) => setFormData({ ...formData, contract_date: e.target.value })}
+                className="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-orange-200 focus:outline-hidden"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Tanggal SPMK (Surat Perintah Mulai Kerja) *
+              </label>
+              <input
+                type="date"
+                value={formData.spmk_date}
+                onChange={(e) => setFormData({ ...formData, spmk_date: e.target.value })}
+                className="w-full text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-orange-200 focus:outline-hidden"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Tanggal Mulai Pelaksanaan *
               </label>
               <input
                 type="date"
@@ -251,7 +282,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Tanggal Selesai Kontrak *
+                Tanggal Selesai Pelaksanaan *
               </label>
               <input
                 type="date"

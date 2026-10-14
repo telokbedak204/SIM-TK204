@@ -48,6 +48,7 @@ const INITIAL_SYSTEM_USERS: SystemUser[] = [
   { id: 'usr-2', name: 'Rian Pratama, ST', email: 'rian.site@simtk204.id', role: 'project_manager', company: 'PT. Teknik Eksakta', password: 'password123', is_active: true },
   { id: 'usr-3', name: 'Ahmad Faisal', email: 'faisal.admin@simtk204.id', role: 'editor', company: 'PT. Teknik Eksakta', password: 'password123', is_active: true },
   { id: 'usr-4', name: 'Dedi Kurniawan, ST', email: 'dedi.mk@simtk204.id', role: 'viewer', company: 'PT. Arcansia Dwitama Konsultan', password: 'password123', is_active: true },
+  { id: 'usr-5', name: 'Guntur, ST', email: 'tukangpipa672@gmail.com', role: 'editor', company: 'PT. Arcansia Dwitama Konsultan KSO PT. Teknik Eksakta', password: 'Loka123', is_active: true },
 ];
 
 export const UserRolesPage: React.FC<UserRolesPageProps> = ({

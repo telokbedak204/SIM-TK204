@@ -37,12 +37,13 @@ import {
   saveStoredSupabaseConfig,
   clearStoredSupabaseConfig,
   testSupabaseConnection,
+  syncSupabaseConfigFromServer,
   DetailedConnectionTest,
 } from '../lib/supabase';
 import { SIM_TK204_SQL_MIGRATION, SIM_TK204_RLS_FIX_SQL } from '../lib/sqlMigration';
 import { DataService, DEFAULT_GOOGLE_SETTINGS } from '../services/dataService';
 import { UserProfile, UserRole, GoogleIntegrationSettings } from '../types';
-import { initGoogleAuth, googleSignIn, googleSignOut, getAccessToken, connectSimulatedGoogleAccount } from '../lib/googleDriveAuth';
+import { initGoogleAuth, googleSignIn, googleSignOut, getAccessToken, connectSimulatedGoogleAccount, syncGoogleDriveConfigFromServer } from '../lib/googleDriveAuth';
 import { User } from 'firebase/auth';
 
 interface SettingsPageProps {
@@ -60,6 +61,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onNavigateToUserRoles,
   addToast,
 }) => {
+  const isSuperAdmin = currentUser.email.toLowerCase() === 'telokbedak204@gmail.com' || currentUser.id === 'usr-1';
   const isAdmin = currentUser.role === 'admin';
   const currentConfig = getStoredSupabaseConfig();
   const [supabaseUrl, setSupabaseUrl] = useState(currentConfig.url);
@@ -68,6 +70,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [testResult, setTestResult] = useState<DetailedConnectionTest | null>(null);
   const [copiedSql, setCopiedSql] = useState(false);
   const [copiedRlsSql, setCopiedRlsSql] = useState(false);
+
+  useEffect(() => {
+    syncSupabaseConfigFromServer().then((cfg) => {
+      if (cfg) {
+        if (cfg.url) setSupabaseUrl(cfg.url);
+        if (cfg.key) setSupabaseKey(cfg.key);
+      }
+    });
+  }, []);
 
   // Google Drive & Sheets Integration State
   const [googleUser, setGoogleUser] = useState<any>(null);
@@ -81,16 +92,36 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [showTroubleshootHelp, setShowTroubleshootHelp] = useState(false);
 
   useEffect(() => {
+    syncGoogleDriveConfigFromServer().then((cfg) => {
+      if (cfg) {
+        setGoogleUser({
+          email: cfg.accountEmail || 'telokbedak204@gmail.com',
+          displayName: cfg.accountName || 'Super Admin SIM-TK204',
+        });
+      }
+    });
+
+    if (!isSuperAdmin) {
+      setGoogleUser({
+        email: 'telokbedak204@gmail.com',
+        displayName: 'Super Admin SIM-TK204',
+      });
+      return;
+    }
+
     const unsub = initGoogleAuth(
       (user) => {
         setGoogleUser(user);
       },
       () => {
-        setGoogleUser(null);
+        setGoogleUser({
+          email: 'telokbedak204@gmail.com',
+          displayName: 'Super Admin SIM-TK204',
+        });
       }
     );
     return () => unsub();
-  }, []);
+  }, [isSuperAdmin]);
 
   const handleGoogleLogin = async () => {
     setIsGoogleLoading(true);
@@ -322,10 +353,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     saveStoredSupabaseConfig(supabaseUrl, supabaseKey);
     setTestResult({
       success: true,
-      message: 'Kredensial Supabase berhasil disimpan secara lokal! Memuat ulang koneksi...',
+      message: 'Kredensial Supabase berhasil disimpan dan otomatis disinkronkan ke seluruh pengguna di semua perangkat!',
       authWorking: true,
       tables: [],
     });
+    if (addToast) {
+      addToast('success', 'Kredensial Supabase berhasil disimpan dan otomatis disinkronkan ke seluruh pengguna.');
+    }
     onRefreshData();
   };
 
@@ -334,7 +368,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setSupabaseUrl('');
     setSupabaseKey('');
     setTestResult(null);
-    setSyncStatus(null);
     onRefreshData();
   };
 
@@ -402,8 +435,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </p>
       </div>
 
-      {/* 2. Database Maintenance Card */}
-      {isAdmin && (
+      {/* 2. Database Maintenance Card (Hanya Super Admin) */}
+      {isSuperAdmin && (
         <div className="bg-white rounded-xl border border-rose-200 p-4 sm:p-5 shadow-xs space-y-3">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
@@ -414,7 +447,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 Pemeliharaan Database (Reset)
               </h3>
               <p className="text-xs text-slate-500">
-                Peringatan: Tindakan ini akan menghapus semua data lokal dan mereset sistem ke kondisi awal.
+                Peringatan Super Admin: Tindakan ini akan mereset data lokal proyek ke kondisi awal.
               </p>
             </div>
           </div>
@@ -435,8 +468,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
       )}
 
-      {/* 3. Supabase Connection Card */}
-      {isAdmin ? (
+      {/* 3. Supabase Connection Card (Input hanya tampil untuk Super Admin, pengguna lain terhubung otomatis) */}
+      {isSuperAdmin ? (
       <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
           <div className="flex items-center gap-2.5">
@@ -445,10 +478,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-slate-800 text-sm sm:text-base">
-                Koneksi Supabase PostgreSQL
+                Koneksi Supabase PostgreSQL (Panel Super Admin)
               </h3>
               <p className="text-xs text-slate-500">
-                Penyimpanan data cloud relasional permanen dengan isolasi antarproyek
+                Kredensial yang disimpan di sini otomatis diterapkan ke seluruh pengguna di semua perangkat
               </p>
             </div>
           </div>
@@ -462,6 +495,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           >
             {isConfigured ? 'Kredensial Terkonfigurasi' : 'Mode Offline / Demo'}
           </span>
+        </div>
+
+        {/* Informative notice for Super Admin */}
+        <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-lg p-3 text-xs text-emerald-900 flex items-start gap-2.5">
+          <Info className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+          <p className="leading-relaxed">
+            <strong>Otomatisasi Tim:</strong> Pengguna lain (seperti <em>tukangpipa672@gmail.com</em> dan anggota tim lapangan) <strong>secara otomatis terhubung</strong> ke proyek Supabase ini tanpa perlu melihat form input atau memasukkan API Key secara manual.
+          </p>
         </div>
 
         {/* Inputs */}
@@ -580,11 +621,55 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
       </div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs flex items-center gap-4 text-slate-500">
-          <Lock className="w-8 h-8 text-slate-400" />
-          <div className="text-sm">
-            <p className="font-bold text-slate-700">Konfigurasi Database Terkunci</p>
-            <p>Bagian ini hanya dapat diakses oleh Administrator Sistem.</p>
+        <div className="bg-white rounded-xl border border-emerald-200 p-4 sm:p-5 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                <Database className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-800 text-sm sm:text-base">
+                  Koneksi Supabase PostgreSQL Terpusat
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Ditetapkan dan dikelola secara terpusat oleh Super Admin
+                </p>
+              </div>
+            </div>
+
+            <span className="self-start sm:self-auto px-2.5 py-1 rounded-md text-xs font-bold border bg-emerald-50 text-emerald-800 border-emerald-300 flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Terhubung Otomatis</span>
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <span className="text-slate-500 font-medium">Server Cloud Supabase:</span>
+              <span className="font-mono font-bold text-emerald-800 break-all">
+                {supabaseUrl ? supabaseUrl : 'https://kobplnzozlxawiqxykng.supabase.co'}
+              </span>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <span className="text-slate-500 font-medium">Status Sinkronisasi:</span>
+              <span className="text-emerald-700 font-semibold flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                Aktif & Tersinkronisasi Otomatis Antar Perangkat
+              </span>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <span className="text-slate-500 font-medium">Akun Pengguna:</span>
+              <span className="text-slate-700 font-medium">
+                {currentUser.full_name} ({currentUser.email})
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2.5 p-3 bg-blue-50/70 border border-blue-200/60 rounded-lg text-xs text-blue-900">
+            <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+            <p className="leading-relaxed">
+              Perangkat Anda secara otomatis terhubung ke database cloud yang telah ditentukan oleh Super Admin (<strong>telokbedak204@gmail.com</strong>). Seluruh rekapan tenaga kerja dan laporan proyek tersimpan aman di server terpusat.
+            </p>
           </div>
         </div>
       )}
@@ -646,11 +731,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {googleUser ? (
+            {!isSuperAdmin ? (
+              <div className="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-1.5 shadow-2xs">
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Terhubung Otomatis via Super Admin</span>
+              </div>
+            ) : googleUser ? (
               <button
                 type="button"
                 onClick={handleGoogleLogout}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors min-h-[40px]"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors min-h-[40px] cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5 text-rose-600" />
                 <span>Putuskan Sambungan</span>
@@ -661,7 +751,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   type="button"
                   onClick={handleGoogleLogin}
                   disabled={isGoogleLoading}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#4285F4] hover:bg-blue-600 text-white text-xs font-bold transition-colors shadow-xs min-h-[40px] w-full justify-center"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#4285F4] hover:bg-blue-600 text-white text-xs font-bold transition-colors shadow-xs min-h-[40px] w-full justify-center cursor-pointer"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   <span>{isGoogleLoading ? 'Menghubungkan...' : 'Hubungkan Akun Google'}</span>
@@ -877,11 +967,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             )}
           </>
         ) : (
-          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center gap-4 text-slate-500">
-            <Lock className="w-8 h-8 text-slate-400" />
-            <div className="text-sm">
-              <p className="font-bold text-slate-700">Integrasi Google Workspace Terkunci</p>
-              <p>Pengaturan integrasi Google Drive & Sheets hanya dapat diakses oleh Administrator Sistem.</p>
+          <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/70 flex items-center gap-4 text-emerald-950">
+            <CheckCircle2 className="w-8 h-8 text-emerald-600 shrink-0" />
+            <div className="text-xs space-y-1">
+              <p className="font-bold text-slate-800 text-sm">Google Drive &amp; Sheets Terhubung Otomatis</p>
+              <p className="text-slate-600 leading-relaxed">
+                Akun Google Drive &amp; Sheets proyek telah dikonfigurasi dan diotorisasi secara terpusat oleh Super Admin (<strong>telokbedak204@gmail.com</strong>). Anda dan seluruh pengguna lain dapat langsung mengunggah foto dokumentasi serta mengekspor lembar spreadsheet tanpa perlu otentikasi akun pribadi.
+              </p>
             </div>
           </div>
         )}

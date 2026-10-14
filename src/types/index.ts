@@ -30,6 +30,8 @@ export interface Project {
   location: string;
   start_date: string; // YYYY-MM-DD
   end_date: string;   // YYYY-MM-DD
+  contract_date?: string; // Tanggal Kontrak
+  spmk_date?: string;     // Tanggal SPMK
   project_manager: string;
   site_manager: string;
   recorder_name?: string;

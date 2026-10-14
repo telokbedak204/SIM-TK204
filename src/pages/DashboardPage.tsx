@@ -105,36 +105,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           </div>
         </div>
 
-        {/* Filter Bar (Period & Date Switcher) */}
+        {/* Periode Monitoring: Mulai Kontrak hingga Tanggal Saat Ini */}
         <div className="mt-5 pt-4 border-t border-[#1c3a63] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2 text-slate-300">
+          <div className="flex flex-wrap items-center gap-2 text-slate-200">
             <Calendar className="w-4 h-4 text-[#F28C28] shrink-0" />
-            <span className="font-semibold">Filter Rentang Periode Monitoring:</span>
+            <span className="font-bold text-white">Periode Monitoring Proyek:</span>
+            <span className="text-slate-300">
+              Mulai Kontrak ({formatDateIndo(project.start_date || startDateStr)}) s/d Tanggal Saat Ini ({formatDateIndo(endDateStr)})
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 xs:grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
-            <div className="flex items-center justify-between gap-1.5 bg-slate-900/60 border border-slate-700 px-3 py-2 rounded-lg min-h-[44px]">
-              <span className="text-[11px] text-slate-400">Dari:</span>
-              <input
-                type="date"
-                value={startDateStr}
-                onChange={(e) => onDateRangeChange(e.target.value, endDateStr)}
-                className="bg-transparent text-white text-xs font-semibold focus:outline-hidden"
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-1.5 bg-slate-900/60 border border-slate-700 px-3 py-2 rounded-lg min-h-[44px]">
-              <span className="text-[11px] text-slate-400">Sampai:</span>
-              <input
-                type="date"
-                value={endDateStr}
-                onChange={(e) => onDateRangeChange(startDateStr, e.target.value)}
-                className="bg-transparent text-white text-xs font-semibold focus:outline-hidden"
-              />
-            </div>
-
-            {/* Quick 7 days demo button */}
-            {/* Hapus atau komentari tombol Periode Demo */}
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1.5 rounded-lg bg-slate-900/70 border border-slate-700 text-slate-300 font-mono text-[11px] flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>Rekapitulasi Kumulatif Berjalan</span>
+            </span>
           </div>
         </div>
       </div>

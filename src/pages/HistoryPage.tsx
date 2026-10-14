@@ -1,28 +1,55 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
-  Archive,
-  Search,
   Calendar,
   FileSpreadsheet,
   FileText,
   ExternalLink,
   Filter,
+  Eye,
   Edit3,
   Trash2,
-  Eye,
-  Plus,
-  X,
-  Check,
-  AlertTriangle,
-  Download,
-  ArrowRight,
+  CheckCircle2,
   Sparkles,
+  Search,
+  Building2,
+  TrendingUp,
+  Users,
+  Check,
+  RotateCcw,
+  Layers,
 } from 'lucide-react';
-import { Project, DailyManpower, JobRole, ReportPackage } from '../types';
+import { Project, DailyManpower, JobRole } from '../types';
 import { formatDateIndo, computeWeeklyMatrix, getDayNameIndo } from '../lib/calculations';
 import { exportWeeklyMonitoringToExcel } from '../lib/excelExport';
 import { exportWeeklyMonitoringToPDF } from '../lib/pdfExport';
-import { DataService } from '../services/dataService';
+
+export interface AutoWeekItem {
+  id: string;
+  weekNumber: number;
+  name: string;
+  start: string;
+  end: string;
+  isCurrentWeek: boolean;
+  hasData: boolean;
+  recordedDays: number;
+}
+
+interface WeekOverride {
+  name?: string;
+  start?: string;
+  end?: string;
+}
+
+function addDays(dateStr: string, days: number): string {
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  d.setDate(d.getDate() + days);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 interface HistoryPageProps {
   projects: Project[];
@@ -44,109 +71,173 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
   addToast,
 }) => {
   const [selectedProjectId, setSelectedProjectId] = useState<string>(activeProject.id);
-  const [packages, setPackages] = useState<ReportPackage[]>([]);
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'current' | 'with_data' | 'empty'>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Modals state
-  const [viewPackage, setViewPackage] = useState<ReportPackage | null>(null);
-  const [editPackage, setEditPackage] = useState<ReportPackage | null>(null);
-  const [deletePackage, setDeletePackage] = useState<ReportPackage | null>(null);
-  const [showAddModal, setShowAddModal] = useState<boolean>(false);
+  // Modals state: View, Edit, Delete
+  const [previewWeek, setPreviewWeek] = useState<AutoWeekItem | null>(null);
+  const [editWeek, setEditWeek] = useState<AutoWeekItem | null>(null);
+  const [deleteWeek, setDeleteWeek] = useState<AutoWeekItem | null>(null);
 
   // Edit form state
   const [editName, setEditName] = useState<string>('');
   const [editStart, setEditStart] = useState<string>('');
   const [editEnd, setEditEnd] = useState<string>('');
 
-  // Add form state
-  const [newName, setNewName] = useState<string>('');
-  const [newStart, setNewStart] = useState<string>('2026-10-02');
-  const [newEnd, setNewEnd] = useState<string>('2026-10-08');
-
+  // Overrides & Deleted weeks persistence in localStorage
   const currentProject = projects.find((p) => p.id === selectedProjectId) || activeProject;
   const projectRecords = allDailyRecords.filter((r) => r.project_id === currentProject.id);
 
-  // Unique recorded dates
-  const uniqueDates = Array.from(new Set(projectRecords.map((r) => r.work_date))).sort();
+  const STORAGE_KEY_OVERRIDES = `sim_tk204_week_overrides_${currentProject.id}`;
+  const STORAGE_KEY_DELETED = `sim_tk204_deleted_weeks_${currentProject.id}`;
 
-  // Load and sync packages from DataService
-  const loadPackages = () => {
-    let list = DataService.getReportPackages(currentProject.id);
-
-    // If list is empty and user hasn't explicitly cleared, seed initial default package
-    const isCleared = typeof window !== 'undefined' && localStorage.getItem(`cleared_packages_${currentProject.id}`);
-    if (list.length === 0 && !isCleared) {
-      const demoPkg: ReportPackage = {
-        id: `pkg-demo-${currentProject.id}`,
-        project_id: currentProject.id,
-        name: 'Monitoring Mingguan Periode Demo (2–8 Oktober 2026)',
-        start: '2026-10-02',
-        end: '2026-10-08',
-        created_at: '2026-10-08T17:00:00.000Z',
-      };
-      DataService.saveReportPackage(demoPkg);
-      list = [demoPkg];
+  const [overrides, setOverrides] = useState<Record<string, WeekOverride>>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_OVERRIDES);
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
     }
+  });
 
-    // Auto-seed full records package if available and not deleted
+  const [deletedWeekIds, setDeletedWeekIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_DELETED);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Re-read storage when project changes
+  useEffect(() => {
+    try {
+      const storedO = localStorage.getItem(`sim_tk204_week_overrides_${currentProject.id}`);
+      setOverrides(storedO ? JSON.parse(storedO) : {});
+      const storedD = localStorage.getItem(`sim_tk204_deleted_weeks_${currentProject.id}`);
+      setDeletedWeekIds(storedD ? JSON.parse(storedD) : []);
+    } catch {
+      setOverrides({});
+      setDeletedWeekIds([]);
+    }
+  }, [currentProject.id]);
+
+  // Unique recorded dates in project
+  const uniqueDates = useMemo(() => {
+    return Array.from(new Set(projectRecords.map((r) => r.work_date))).sort();
+  }, [projectRecords]);
+
+  // Automatic Weekly Cycle Generation based on project contract start date (7-day cycles)
+  const allAutoWeeks = useMemo<AutoWeekItem[]>(() => {
+    const startContract = currentProject.start_date || (uniqueDates.length > 0 ? uniqueDates[0] : '2026-08-28');
+    const today = new Date().toISOString().split('T')[0];
+
+    // Cover up to today or latest recorded date, whichever is later
+    let maxDate = today;
     if (uniqueDates.length > 0) {
-      const minDate = uniqueDates[0];
-      const maxDate = uniqueDates[uniqueDates.length - 1];
-      const hasFull = list.some((p) => p.start === minDate && p.end === maxDate);
-      const isDeletedFull = typeof window !== 'undefined' && localStorage.getItem(`deleted_pkg_full_${currentProject.id}`);
-
-      if (!hasFull && !isDeletedFull && (minDate !== '2026-10-02' || maxDate !== '2026-10-08')) {
-        const fullPkg: ReportPackage = {
-          id: `pkg-full-${currentProject.id}`,
-          project_id: currentProject.id,
-          name: `Seluruh Catatan Lapangan (${formatDateIndo(minDate)} s/d ${formatDateIndo(maxDate)})`,
-          start: minDate,
-          end: maxDate,
-          created_at: new Date().toISOString(),
-        };
-        DataService.saveReportPackage(fullPkg);
-        list = DataService.getReportPackages(currentProject.id);
+      const lastRecorded = uniqueDates[uniqueDates.length - 1];
+      if (lastRecorded > maxDate) {
+        maxDate = lastRecorded;
       }
     }
 
-    setPackages(list);
-  };
+    const items: AutoWeekItem[] = [];
+    let currentStart = startContract;
+    let weekNumber = 1;
 
-  useEffect(() => {
-    loadPackages();
-  }, [currentProject.id, uniqueDates.length]);
+    while (currentStart <= maxDate || weekNumber === 1) {
+      const currentEnd = addDays(currentStart, 6);
+      const isCurrent = today >= currentStart && today <= currentEnd;
+      const weekId = `auto-week-${currentProject.id}-${weekNumber}`;
 
-  const handleExportExcel = (start: string, end: string) => {
-    try {
-      const summary = computeWeeklyMatrix(start, end, allRoles, projectRecords);
-      const fileName = exportWeeklyMonitoringToExcel(currentProject, summary, start, end);
-      if (addToast) addToast('success', `Laporan Excel berhasil diunduh (${fileName})`, 'Unduh Excel');
-    } catch (err: any) {
-      if (addToast) addToast('error', 'Gagal mengunduh Excel: ' + (err.message || 'Error'));
+      // Check if user has edited/overridden this week
+      const custom = overrides[weekId];
+      const effectiveStart = custom?.start || currentStart;
+      const effectiveEnd = custom?.end || currentEnd;
+      const effectiveName = custom?.name || `Monitoring Minggu Ke ${weekNumber}`;
+
+      // Count distinct recorded days in this week
+      const daysWithData = new Set(
+        projectRecords
+          .filter((r) => r.work_date >= effectiveStart && r.work_date <= effectiveEnd)
+          .map((r) => r.work_date)
+      );
+
+      items.push({
+        id: weekId,
+        weekNumber,
+        name: effectiveName,
+        start: effectiveStart,
+        end: effectiveEnd,
+        isCurrentWeek: isCurrent,
+        hasData: daysWithData.size > 0,
+        recordedDays: daysWithData.size,
+      });
+
+      currentStart = addDays(currentEnd, 1);
+      weekNumber++;
+
+      if (weekNumber > 300) break; // safety guard
     }
-  };
 
-  const handleExportPDF = (start: string, end: string) => {
-    try {
-      const summary = computeWeeklyMatrix(start, end, allRoles, projectRecords);
-      const fileName = exportWeeklyMonitoringToPDF(currentProject, summary, start, end);
-      if (addToast) addToast('success', `Laporan PDF resmi berhasil dibuat (${fileName})`, 'Unduh PDF');
-    } catch (err: any) {
-      if (addToast) addToast('error', 'Gagal mengunduh PDF: ' + (err.message || 'Error'));
+    return items;
+  }, [currentProject.start_date, currentProject.id, uniqueDates, projectRecords, overrides]);
+
+  // Filter & Search weeks (excluding deleted ones)
+  const filteredWeeks = useMemo(() => {
+    let result = allAutoWeeks.filter((w) => !deletedWeekIds.includes(w.id));
+
+    // Search query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter(
+        (w) =>
+          w.name.toLowerCase().includes(q) ||
+          w.weekNumber.toString().includes(q) ||
+          w.start.includes(q) ||
+          w.end.includes(q) ||
+          formatDateIndo(w.start).toLowerCase().includes(q) ||
+          formatDateIndo(w.end).toLowerCase().includes(q)
+      );
     }
+
+    // Status filter
+    if (filterStatus === 'current') {
+      result = result.filter((w) => w.isCurrentWeek);
+    } else if (filterStatus === 'with_data') {
+      result = result.filter((w) => w.hasData);
+    } else if (filterStatus === 'empty') {
+      result = result.filter((w) => !w.hasData);
+    }
+
+    // Sorting
+    return sortOrder === 'desc' ? [...result].reverse() : result;
+  }, [allAutoWeeks, deletedWeekIds, searchQuery, filterStatus, sortOrder]);
+
+  // Cumulative project summary (contract start to today)
+  const fullProjectSummary = useMemo(() => {
+    const start = currentProject.start_date || '2026-08-28';
+    const today = new Date().toISOString().split('T')[0];
+    const end = uniqueDates.length > 0 && uniqueDates[uniqueDates.length - 1] > today ? uniqueDates[uniqueDates.length - 1] : today;
+    return {
+      start,
+      end,
+      matrix: computeWeeklyMatrix(start, end, allRoles, projectRecords),
+    };
+  }, [currentProject.start_date, uniqueDates, allRoles, projectRecords]);
+
+  // Handle Edit Action
+  const handleOpenEdit = (week: AutoWeekItem) => {
+    setEditWeek(week);
+    setEditName(week.name);
+    setEditStart(week.start);
+    setEditEnd(week.end);
   };
 
-  // Open Edit Modal
-  const handleOpenEdit = (pkg: ReportPackage) => {
-    setEditPackage(pkg);
-    setEditName(pkg.name);
-    setEditStart(pkg.start);
-    setEditEnd(pkg.end);
-  };
-
-  // Save Edit
   const handleSaveEdit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editPackage) return;
+    if (!editWeek) return;
 
     if (!editName.trim()) {
       if (addToast) addToast('warning', 'Nama paket laporan wajib diisi.');
@@ -157,67 +248,71 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
       return;
     }
 
-    const updated: ReportPackage = {
-      ...editPackage,
-      name: editName.trim(),
-      start: editStart,
-      end: editEnd,
+    const updatedOverrides = {
+      ...overrides,
+      [editWeek.id]: {
+        name: editName.trim(),
+        start: editStart,
+        end: editEnd,
+      },
     };
 
-    DataService.saveReportPackage(updated);
-    loadPackages();
-    setEditPackage(null);
-    if (addToast) addToast('success', `Paket laporan "${updated.name}" berhasil diperbarui!`, 'Perubahan Disimpan');
+    setOverrides(updatedOverrides);
+    try {
+      localStorage.setItem(STORAGE_KEY_OVERRIDES, JSON.stringify(updatedOverrides));
+    } catch (err) {
+      console.warn('Failed to save week overrides to localStorage:', err);
+    }
+
+    setEditWeek(null);
+    if (addToast) addToast('success', `Paket laporan "${editName.trim()}" berhasil diperbarui!`, 'Perubahan Disimpan');
   };
 
-  // Confirm Delete
+  // Handle Delete Action
   const handleConfirmDelete = () => {
-    if (!deletePackage) return;
+    if (!deleteWeek) return;
 
-    if (deletePackage.id.startsWith('pkg-full-')) {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(`deleted_pkg_full_${currentProject.id}`, 'true');
-      }
+    const updatedDeleted = Array.from(new Set([...deletedWeekIds, deleteWeek.id]));
+    setDeletedWeekIds(updatedDeleted);
+    try {
+      localStorage.setItem(STORAGE_KEY_DELETED, JSON.stringify(updatedDeleted));
+    } catch (err) {
+      console.warn('Failed to save deleted weeks to localStorage:', err);
     }
 
-    DataService.deleteReportPackage(deletePackage.id);
-    const updated = packages.filter((p) => p.id !== deletePackage.id);
-    setPackages(updated);
-
-    if (updated.length === 0 && typeof window !== 'undefined') {
-      localStorage.setItem(`cleared_packages_${currentProject.id}`, 'true');
-    }
-
-    if (addToast) addToast('info', `Paket laporan "${deletePackage.name}" berhasil dihapus.`);
-    setDeletePackage(null);
+    if (addToast) addToast('info', `Paket laporan "${deleteWeek.name}" berhasil dihapus.`);
+    setDeleteWeek(null);
   };
 
-  // Create New Package
-  const handleCreatePackage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName.trim()) {
-      if (addToast) addToast('warning', 'Nama paket laporan wajib diisi.');
-      return;
+  // Restore all deleted weeks
+  const handleRestoreDeleted = () => {
+    setDeletedWeekIds([]);
+    try {
+      localStorage.removeItem(STORAGE_KEY_DELETED);
+    } catch (err) {
+      console.warn('Failed to clear deleted weeks:', err);
     }
-    if (newStart > newEnd) {
-      if (addToast) addToast('warning', 'Tanggal akhir tidak boleh mendahului tanggal mulai.');
-      return;
+    if (addToast) addToast('success', 'Semua paket laporan yang dihapus telah dipulihkan.', 'Dipulihkan');
+  };
+
+  const handleExportExcel = (start: string, end: string, label?: string) => {
+    try {
+      const summary = computeWeeklyMatrix(start, end, allRoles, projectRecords);
+      const fileName = exportWeeklyMonitoringToExcel(currentProject, summary, start, end);
+      if (addToast) addToast('success', `Laporan Excel ${label ? `(${label}) ` : ''}berhasil diunduh (${fileName})`, 'Unduh Excel');
+    } catch (err: any) {
+      if (addToast) addToast('error', 'Gagal mengunduh Excel: ' + (err.message || 'Error'));
     }
+  };
 
-    const newPkg: ReportPackage = {
-      id: `pkg-${Date.now()}`,
-      project_id: currentProject.id,
-      name: setNewName.name ? newName.trim() : newName.trim(),
-      start: newStart,
-      end: newEnd,
-      created_at: new Date().toISOString(),
-    };
-
-    DataService.saveReportPackage(newPkg);
-    loadPackages();
-    setShowAddModal(false);
-    setNewName('');
-    if (addToast) addToast('success', `Paket laporan "${newPkg.name}" berhasil dibuat!`, 'Paket Baru');
+  const handleExportPDF = (start: string, end: string, label?: string) => {
+    try {
+      const summary = computeWeeklyMatrix(start, end, allRoles, projectRecords);
+      const fileName = exportWeeklyMonitoringToPDF(currentProject, summary, start, end);
+      if (addToast) addToast('success', `Laporan PDF resmi ${label ? `(${label}) ` : ''}berhasil dibuat (${fileName})`, 'Unduh PDF');
+    } catch (err: any) {
+      if (addToast) addToast('error', 'Gagal mengunduh PDF: ' + (err.message || 'Error'));
+    }
   };
 
   return (
@@ -231,14 +326,15 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
               Riwayat & Arsip Laporan Proyek
             </h2>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Telusuri arsip berkas monitoring mingguan, rekap periode, dan cetak ulang laporan resmi.
+          <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
+            Pengelompokan mingguan (siklus 7 hari) dibuat secara otomatis dari tanggal mulai kontrak ({formatDateIndo(currentProject.start_date || '2026-08-28')}) hingga minggu berjalan. Anda dapat melihat, mengedit nama/periode, atau menghapus paket laporan sesuai kebutuhan.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Project Selector */}
-          <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
+          <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200 shadow-2xs">
+            <Building2 className="w-4 h-4 text-[#142B4A]" />
             <span className="text-xs font-semibold text-slate-600">Proyek:</span>
             <select
               value={selectedProjectId}
@@ -256,64 +352,181 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
             </select>
           </div>
 
-          {/* Add Package Button */}
+          {/* Automatic Badge */}
+          <div className="flex items-center gap-2 bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-200 text-emerald-800 text-xs font-bold shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Otomatis Perminggu Aktif</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter, Search & Sorting Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 text-xs shadow-2xs">
+        {/* Status Filter Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
           <button
             type="button"
-            onClick={() => {
-              setNewName(`Monitoring Mingguan (${formatDateIndo(uniqueDates[0] || '2026-10-02')})`);
-              setShowAddModal(true);
-            }}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#142B4A] hover:bg-[#1e3a60] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+            onClick={() => setFilterStatus('all')}
+            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer whitespace-nowrap ${
+              filterStatus === 'all'
+                ? 'bg-[#142B4A] text-white shadow-xs'
+                : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+            }`}
           >
-            <Plus className="w-4 h-4 text-amber-400" />
-            <span>+ Buat Paket Laporan</span>
+            Semua Minggu ({allAutoWeeks.filter((w) => !deletedWeekIds.includes(w.id)).length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterStatus('current')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              filterStatus === 'current'
+                ? 'bg-emerald-700 text-white shadow-xs font-bold'
+                : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span>Minggu Berjalan</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterStatus('with_data')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer whitespace-nowrap ${
+              filterStatus === 'with_data'
+                ? 'bg-[#F28C28] text-white shadow-xs font-bold'
+                : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Ada Data ({allAutoWeeks.filter((w) => w.hasData && !deletedWeekIds.includes(w.id)).length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterStatus('empty')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer whitespace-nowrap ${
+              filterStatus === 'empty'
+                ? 'bg-slate-700 text-white shadow-xs font-bold'
+                : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Belum Ada Data ({allAutoWeeks.filter((w) => !w.hasData && !deletedWeekIds.includes(w.id)).length})
+          </button>
+        </div>
+
+        {/* Search, Sort & Restore Controls */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {deletedWeekIds.length > 0 && (
+            <button
+              type="button"
+              onClick={handleRestoreDeleted}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold cursor-pointer transition-colors shadow-2xs"
+              title="Pulihkan semua paket laporan yang dihapus"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-[#F28C28]" />
+              <span>Pulihkan Terhapus ({deletedWeekIds.length})</span>
+            </button>
+          )}
+
+          <div className="relative flex-1 sm:w-56">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari minggu (mis: 4, 1) / tgl..."
+              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-1 focus:ring-[#142B4A]"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold cursor-pointer shrink-0 shadow-2xs"
+            title="Ubah urutan pengelompokan minggu"
+          >
+            <Filter className="w-3.5 h-3.5 text-slate-500" />
+            <span>{sortOrder === 'desc' ? 'Terbaru di Atas' : 'Minggu 1 di Atas'}</span>
           </button>
         </div>
       </div>
 
-      {/* Package List Grid */}
-      {packages.length === 0 ? (
+      {/* Grid Kartu Paket Laporan Mingguan */}
+      {filteredWeeks.length === 0 ? (
         <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-[#F28C28] flex items-center justify-center mx-auto">
-            <Archive className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+            <Layers className="w-6 h-6" />
           </div>
-          <h3 className="text-base font-bold text-slate-800">Belum Ada Paket Laporan Tersimpan</h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto">
-            Belum ada paket laporan arsip untuk proyek ini. Klik tombol di bawah untuk membuat paket arsip monitoring baru.
+          <h3 className="text-base font-bold text-slate-800">Tidak ada paket laporan yang cocok</h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            {deletedWeekIds.length > 0
+              ? 'Beberapa paket laporan mungkin telah dihapus. Klik tombol Pulihkan Terhapus di atas untuk mengembalikannya.'
+              : 'Coba bersihkan pencarian atau ubah filter status di atas.'}
           </p>
-          <button
-            type="button"
-            onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 bg-[#F28C28] hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition-colors shadow-xs"
-          >
-            + Buat Paket Laporan Baru
-          </button>
+          <div className="flex items-center justify-center gap-2 pt-2">
+            {deletedWeekIds.length > 0 && (
+              <button
+                type="button"
+                onClick={handleRestoreDeleted}
+                className="px-4 py-2 bg-[#F28C28] hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                Pulihkan Paket Terhapus
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setFilterStatus('all');
+                setSearchQuery('');
+              }}
+              className="px-4 py-2 bg-[#142B4A] hover:bg-[#1e3a60] text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
+            >
+              Tampilkan Semua
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {packages.map((pkg, idx) => {
-            const summary = computeWeeklyMatrix(pkg.start, pkg.end, allRoles, projectRecords);
+          {filteredWeeks.map((week) => {
+            const summary = computeWeeklyMatrix(week.start, week.end, allRoles, projectRecords);
 
             return (
               <div
-                key={pkg.id}
-                className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between hover:border-amber-400 transition-all group"
+                key={week.id}
+                className={`bg-white rounded-2xl border p-5 shadow-xs flex flex-col justify-between transition-all group ${
+                  week.isCurrentWeek
+                    ? 'border-amber-400 ring-2 ring-amber-100/80 bg-gradient-to-br from-amber-50/20 to-white'
+                    : 'border-slate-200 hover:border-amber-400'
+                }`}
               >
                 <div>
                   {/* Card Header Badge & Duration */}
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-md bg-blue-50 text-[#142B4A] border border-blue-200 flex items-center gap-1">
-                      <span>PAKET LAPORAN</span>
-                      <span className="text-slate-400 font-normal">#{idx + 1}</span>
-                    </span>
+                  <div className="flex items-center justify-between gap-2 mb-2.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-md bg-blue-50 text-[#142B4A] border border-blue-200">
+                        PAKET LAPORAN #{week.weekNumber}
+                      </span>
+                      {week.isCurrentWeek && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                          <span>Minggu Berjalan</span>
+                        </span>
+                      )}
+                      {week.hasData ? (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
+                          {week.recordedDays}/7 Hari Terisi
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-normal px-2 py-0.5 rounded-md bg-slate-50 text-slate-400 border border-slate-100">
+                          Belum Ada Data
+                        </span>
+                      )}
+                    </div>
                     <span className="text-xs font-mono text-slate-500 font-semibold">
-                      {summary.calendarDaysCount} Hari Kalender
+                      7 Hari Kalender
                     </span>
                   </div>
 
                   {/* Title */}
-                  <h3 className="font-bold text-slate-900 text-base leading-snug mb-3 line-clamp-2">
-                    {pkg.name}
+                  <h3 className="font-bold text-slate-900 text-base leading-snug mb-3">
+                    {week.name}
                   </h3>
 
                   {/* Key Stats Box */}
@@ -321,7 +534,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                     <div className="flex items-center justify-between">
                       <span className="text-slate-500">Rentang Tanggal:</span>
                       <span className="font-semibold text-slate-900">
-                        {formatDateIndo(pkg.start)} s/d {formatDateIndo(pkg.end)}
+                        {formatDateIndo(week.start)} s/d {formatDateIndo(week.end)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
@@ -339,14 +552,13 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                   </div>
                 </div>
 
-                {/* Action Buttons: Tombol Edit, Hapus, dan View (serta Excel & PDF) */}
+                {/* Action Buttons: View, Edit, Hapus, Excel, PDF (Identik persis dengan screenshot) */}
                 <div className="pt-3.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-                  {/* Group Utama: Edit, Hapus, dan View */}
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {/* Tombol View */}
                     <button
                       type="button"
-                      onClick={() => setViewPackage(pkg)}
+                      onClick={() => setPreviewWeek(week)}
                       className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#142B4A] hover:bg-[#1e3a60] text-white text-xs font-bold transition-all shadow-xs cursor-pointer min-h-[38px]"
                       title="Lihat Pratinjau Lengkap Laporan"
                     >
@@ -357,7 +569,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                     {/* Tombol Edit */}
                     <button
                       type="button"
-                      onClick={() => handleOpenEdit(pkg)}
+                      onClick={() => handleOpenEdit(week)}
                       className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#F28C28] hover:bg-orange-600 text-white text-xs font-bold transition-all shadow-xs cursor-pointer min-h-[38px]"
                       title="Edit Nama atau Rentang Tanggal Paket Laporan"
                     >
@@ -368,7 +580,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                     {/* Tombol Hapus */}
                     <button
                       type="button"
-                      onClick={() => setDeletePackage(pkg)}
+                      onClick={() => setDeleteWeek(week)}
                       className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 border border-rose-200 text-xs font-bold transition-all shadow-xs cursor-pointer min-h-[38px]"
                       title="Hapus Paket Laporan Ini"
                     >
@@ -381,7 +593,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
-                      onClick={() => handleExportExcel(pkg.start, pkg.end)}
+                      onClick={() => handleExportExcel(week.start, week.end, week.name)}
                       className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 text-xs font-bold transition-colors min-h-[38px] cursor-pointer"
                       title="Unduh Rekap Excel (.xlsx)"
                     >
@@ -391,7 +603,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
 
                     <button
                       type="button"
-                      onClick={() => handleExportPDF(pkg.start, pkg.end)}
+                      onClick={() => handleExportPDF(week.start, week.end, week.name)}
                       className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-lg bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-200 text-xs font-bold transition-colors min-h-[38px] cursor-pointer"
                       title="Unduh Dokumen PDF Resmi"
                     >
@@ -407,8 +619,8 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
       )}
 
       {/* Modal View / Pratinjau Paket Laporan */}
-      {viewPackage && (() => {
-        const viewSummary = computeWeeklyMatrix(viewPackage.start, viewPackage.end, allRoles, projectRecords);
+      {previewWeek && (() => {
+        const viewSummary = computeWeeklyMatrix(previewWeek.start, previewWeek.end, allRoles, projectRecords);
         return (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
             <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
@@ -420,14 +632,14 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                   <div>
                     <h3 className="text-base font-bold">Pratinjau Paket Laporan</h3>
                     <p className="text-xs text-slate-300">
-                      {viewPackage.name}
+                      {previewWeek.name} ({formatDateIndo(previewWeek.start)} s/d {formatDateIndo(previewWeek.end)})
                     </p>
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setViewPackage(null)}
-                  className="text-slate-300 hover:text-white p-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold"
+                  onClick={() => setPreviewWeek(null)}
+                  className="text-slate-300 hover:text-white p-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold cursor-pointer"
                 >
                   ✕ Tutup
                 </button>
@@ -459,7 +671,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                   <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-100">
                     <span className="text-slate-500">Rentang Periode:</span>
                     <span className="font-bold text-slate-800">
-                      {formatDateIndo(viewPackage.start)} s/d {formatDateIndo(viewPackage.end)}
+                      {formatDateIndo(previewWeek.start)} s/d {formatDateIndo(previewWeek.end)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-100">
@@ -467,7 +679,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                     <span className="font-bold text-slate-800">{currentProject.name}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">Konsultan Pengawas:</span>
+                    <span className="text-slate-500">Konsultan Pengawas MK:</span>
                     <span className="font-semibold text-slate-700">{currentProject.consultant_name || '-'}</span>
                   </div>
                 </div>
@@ -476,9 +688,9 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
                   <div className="bg-slate-100 px-3.5 py-2 border-b border-slate-200 text-xs font-bold text-slate-700 flex items-center justify-between">
                     <span>Rekap Kehadiran Jabatan / Tenaga Kerja</span>
-                    <span className="text-[10px] text-slate-500 font-normal">Periode Terpilih</span>
+                    <span className="text-[10px] text-slate-500 font-normal">Minggu Ke-{previewWeek.weekNumber}</span>
                   </div>
-                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 text-xs">
+                  <div className="max-h-56 overflow-y-auto divide-y divide-slate-100 text-xs">
                     {viewSummary.rows.map((row) => (
                       <div key={row.roleId} className="px-3.5 py-2 flex items-center justify-between hover:bg-slate-50">
                         <span className="font-medium text-slate-800">{row.roleName}</span>
@@ -497,8 +709,10 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    setViewPackage(null);
-                    onOpenReport(viewPackage.start, viewPackage.end);
+                    const start = previewWeek.start;
+                    const end = previewWeek.end;
+                    setPreviewWeek(null);
+                    onOpenReport(start, end);
                   }}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#142B4A] hover:bg-[#1e3a60] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
                 >
@@ -509,7 +723,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => handleExportExcel(viewPackage.start, viewPackage.end)}
+                    onClick={() => handleExportExcel(previewWeek.start, previewWeek.end, previewWeek.name)}
                     className="flex items-center gap-1 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 text-xs font-bold transition-colors cursor-pointer"
                   >
                     <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
@@ -517,7 +731,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleExportPDF(viewPackage.start, viewPackage.end)}
+                    onClick={() => handleExportPDF(previewWeek.start, previewWeek.end, previewWeek.name)}
                     className="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-200 text-xs font-bold transition-colors cursor-pointer"
                   >
                     <FileText className="w-3.5 h-3.5 text-slate-700" />
@@ -525,7 +739,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setViewPackage(null)}
+                    onClick={() => setPreviewWeek(null)}
                     className="px-3.5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
                   >
                     Tutup
@@ -538,7 +752,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
       })()}
 
       {/* Modal Edit Paket Laporan */}
-      {editPackage && (
+      {editWeek && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200 space-y-0">
             <div className="bg-[#142B4A] text-white p-4 sm:p-5 flex items-center justify-between">
@@ -550,8 +764,8 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => setEditPackage(null)}
-                className="text-slate-300 hover:text-white p-1 rounded-lg text-xs font-bold"
+                onClick={() => setEditWeek(null)}
+                className="text-slate-300 hover:text-white p-1 rounded-lg text-xs font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -567,7 +781,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-[#F28C28]"
-                  placeholder="Contoh: Monitoring Mingguan Periode 1"
+                  placeholder="Contoh: Monitoring Minggu Ke 4"
                   required
                 />
               </div>
@@ -602,14 +816,14 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setEditPackage(null)}
+                  onClick={() => setEditWeek(null)}
                   className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-[#F28C28] hover:bg-orange-600 text-white text-xs font-bold shadow-md cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#F28C28] hover:bg-orange-600 text-white text-xs font-bold shadow-md cursor-pointer transition-all active:scale-95"
                 >
                   Simpan Perubahan
                 </button>
@@ -620,7 +834,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
       )}
 
       {/* Modal Hapus Paket Laporan */}
-      {deletePackage && (
+      {deleteWeek && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4">
             <div className="flex items-center gap-3">
@@ -630,19 +844,19 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
               <div>
                 <h3 className="text-sm font-bold text-slate-800">Hapus Paket Laporan?</h3>
                 <p className="text-xs text-slate-500 font-semibold line-clamp-1">
-                  {deletePackage.name}
+                  {deleteWeek.name}
                 </p>
               </div>
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-              Apakah Anda yakin ingin menghapus kartu paket laporan periode <strong>{formatDateIndo(deletePackage.start)} s/d {formatDateIndo(deletePackage.end)}</strong>? Seluruh data catatan kehadiran harian Anda tetap tersimpan aman.
+              Apakah Anda yakin ingin menghapus kartu paket laporan periode <strong>{formatDateIndo(deleteWeek.start)} s/d {formatDateIndo(deleteWeek.end)}</strong>? Seluruh data catatan kehadiran harian Anda tetap tersimpan aman.
             </p>
 
             <div className="flex items-center justify-end gap-2.5 pt-2">
               <button
                 type="button"
-                onClick={() => setDeletePackage(null)}
+                onClick={() => setDeleteWeek(null)}
                 className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
               >
                 Batal
@@ -655,88 +869,6 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                 Ya, Hapus Paket
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Buat Paket Laporan Baru */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden border border-slate-200 space-y-0">
-            <div className="bg-[#142B4A] text-white p-4 sm:p-5 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-amber-400">
-                  <Plus className="w-4 h-4" />
-                </div>
-                <h3 className="text-base font-bold">Buat Paket Laporan Baru</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAddModal(false)}
-                className="text-slate-300 hover:text-white p-1 rounded-lg text-xs font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleCreatePackage} className="p-5 sm:p-6 space-y-4 bg-white">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Nama / Judul Paket Laporan
-                </label>
-                <input
-                  type="text"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-[#142B4A]"
-                  placeholder="Contoh: Monitoring Periode Minggu ke-2"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Tanggal Mulai
-                  </label>
-                  <input
-                    type="date"
-                    value={newStart}
-                    onChange={(e) => setNewStart(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-[#142B4A]"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Tanggal Selesai
-                  </label>
-                  <input
-                    type="date"
-                    value={newEnd}
-                    onChange={(e) => setNewEnd(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-[#142B4A]"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl bg-[#142B4A] hover:bg-[#1e3a60] text-white text-xs font-bold shadow-md cursor-pointer"
-                >
-                  Buat Paket
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

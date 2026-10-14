@@ -48,6 +48,8 @@ export const INITIAL_DEMO_PROJECT: Project = {
   location: 'Kab. Kep. Anambas',
   start_date: '2026-08-28',
   end_date: '2026-12-31',
+  contract_date: '2026-08-18',
+  spmk_date: '2026-08-28',
   project_manager: 'Ir. Hendra Wijaya, MT',
   site_manager: 'Rian Pratama, ST',
   recorder_name: 'Ahmad Faisal (Site Admin)',
@@ -207,7 +209,7 @@ export class DataService {
       { id: 'usr-2', name: 'Rian Pratama, ST', email: 'rian.site@simtk204.id', role: 'project_manager' as UserRole, company: 'PT. Teknik Eksakta', password: 'password123', is_active: true },
       { id: 'usr-3', name: 'Ahmad Faisal', email: 'faisal.admin@simtk204.id', role: 'editor' as UserRole, company: 'PT. Teknik Eksakta', password: 'password123', is_active: true },
       { id: 'usr-4', name: 'Dedi Kurniawan, ST', email: 'dedi.mk@simtk204.id', role: 'viewer' as UserRole, company: 'PT. Arcansia Dwitama Konsultan', password: 'password123', is_active: true },
-      { id: 'usr-5', name: 'Guntur, ST', email: 'tukangpipa672@gmail.com', role: 'admin' as UserRole, company: 'PT. Arcansia Dwitama Konsultan KSO PT. Teknik Eksakta', password: 'Loka123', is_active: true },
+      { id: 'usr-5', name: 'Guntur, ST', email: 'tukangpipa672@gmail.com', role: 'editor' as UserRole, company: 'PT. Arcansia Dwitama Konsultan KSO PT. Teknik Eksakta', password: 'Loka123', is_active: true },
     ];
     if (typeof window === 'undefined') return INITIAL_USERS;
     try {
@@ -228,6 +230,11 @@ export class DataService {
     } catch {
       return INITIAL_USERS;
     }
+  }
+
+  static isSuperAdmin(user?: UserProfile | null): boolean {
+    if (!user) return false;
+    return user.email.toLowerCase() === 'telokbedak204@gmail.com' || user.id === 'usr-1';
   }
 
   static authenticate(identifier: string, password: string): { success: boolean; user?: UserProfile; error?: string } {
@@ -275,7 +282,7 @@ export class DataService {
   }
 
   static setSimulatedRole(role: UserRole) {
-    const cur = this.getCurrentUser();
+    const cur = this.getCurrentUser() || DEFAULT_USER;
     this.setCurrentUser({ ...cur, role });
   }
 
@@ -594,6 +601,8 @@ export class DataService {
             location: project.location?.trim() || '',
             start_date: project.start_date || '2026-10-01',
             end_date: project.end_date || '2026-12-31',
+            contract_date: project.contract_date && project.contract_date.trim() !== '' ? project.contract_date : null,
+            spmk_date: project.spmk_date && project.spmk_date.trim() !== '' ? project.spmk_date : null,
             project_manager: project.project_manager?.trim() || '',
             site_manager: project.site_manager?.trim() || '',
             recorder_name: project.recorder_name?.trim() || '',
@@ -602,10 +611,20 @@ export class DataService {
             updated_at: now,
           };
 
-          const { error } = await client
+          let { error } = await client
             .from('projects')
             .update(updatePayload)
             .eq('id', existingDbProject.id);
+
+          if (error && (error.message.includes('contract_date') || error.message.includes('spmk_date') || error.message.includes('schema cache'))) {
+            delete updatePayload.contract_date;
+            delete updatePayload.spmk_date;
+            const retryRes = await client
+              .from('projects')
+              .update(updatePayload)
+              .eq('id', existingDbProject.id);
+            error = retryRes.error;
+          }
 
           if (error) {
             throw new Error(`Gagal memperbarui ke database Supabase: ${error.message}`);
@@ -626,6 +645,8 @@ export class DataService {
             location: project.location?.trim() || '',
             start_date: project.start_date || '2026-10-01',
             end_date: project.end_date || '2026-12-31',
+            contract_date: project.contract_date && project.contract_date.trim() !== '' ? project.contract_date : null,
+            spmk_date: project.spmk_date && project.spmk_date.trim() !== '' ? project.spmk_date : null,
             project_manager: project.project_manager?.trim() || '',
             site_manager: project.site_manager?.trim() || '',
             recorder_name: project.recorder_name?.trim() || '',
@@ -635,13 +656,22 @@ export class DataService {
             updated_at: now,
           };
 
-          if (user.id && isValidUUID(user.id)) {
+          if (user && user.id && isValidUUID(user.id)) {
             insertPayload.created_by = user.id;
           }
 
-          const { error } = await client
+          let { error } = await client
             .from('projects')
             .insert([insertPayload]);
+
+          if (error && (error.message.includes('contract_date') || error.message.includes('spmk_date') || error.message.includes('schema cache'))) {
+            delete insertPayload.contract_date;
+            delete insertPayload.spmk_date;
+            const retryRes = await client
+              .from('projects')
+              .insert([insertPayload]);
+            error = retryRes.error;
+          }
 
           if (error) {
             throw new Error(`Gagal menyimpan ke database Supabase: ${error.message}`);
@@ -669,6 +699,8 @@ export class DataService {
       location: project.location?.trim() || '',
       start_date: project.start_date || '2026-10-01',
       end_date: project.end_date || '2026-12-31',
+      contract_date: project.contract_date || undefined,
+      spmk_date: project.spmk_date || undefined,
       project_manager: project.project_manager?.trim() || '',
       site_manager: project.site_manager?.trim() || '',
       recorder_name: project.recorder_name?.trim() || '',
@@ -967,7 +999,7 @@ export class DataService {
     const user = this.getCurrentUser();
 
     // Check RBAC: viewer is forbidden from saving
-    if (user.role === 'viewer') {
+    if (user && user.role === 'viewer') {
       return {
         success: false,
         count: 0,
@@ -983,12 +1015,35 @@ export class DataService {
       work_date: workDate,
       worker_count: Math.max(0, Math.floor(entry.worker_count || 0)),
       notes: entry.notes?.trim() || '',
-      created_by: user.id && isValidUUID(user.id) ? user.id : undefined,
+      created_by: user && user.id && isValidUUID(user.id) ? user.id : undefined,
       created_at: now,
       updated_at: now,
     }));
 
-    // If Supabase configured, execute real upsert with onConflict clause
+    // 1. Local storage upsert first (ensuring zero data loss and immediate offline persistence)
+    try {
+      const allRecords: DailyManpower[] = JSON.parse(localStorage.getItem(KEY_MANPOWER) || '[]');
+      for (const item of payloadList) {
+        const existingIdx = allRecords.findIndex(
+          (r) => r.project_id === projectId && r.job_role_id === item.job_role_id && r.work_date === workDate
+        );
+        if (existingIdx >= 0) {
+          allRecords[existingIdx] = {
+            ...allRecords[existingIdx],
+            worker_count: item.worker_count,
+            notes: item.notes,
+            updated_at: now,
+          };
+        } else {
+          allRecords.push(item);
+        }
+      }
+      localStorage.setItem(KEY_MANPOWER, JSON.stringify(allRecords));
+    } catch (localErr) {
+      console.warn('Local storage write warning:', localErr);
+    }
+
+    // 2. If Supabase configured, synchronize with cloud database
     if (isSupabaseConfigured()) {
       const client = getSupabase();
       if (client) {
@@ -1000,44 +1055,24 @@ export class DataService {
             });
 
           if (error) {
-            console.error('Supabase upsertDailyManpowerBatch error:', error);
+            console.warn('Supabase upsertDailyManpowerBatch sync warning:', error);
             return {
-              success: false,
-              count: 0,
-              error: `Gagal menyimpan ke database Supabase: ${error.message} (Kode: ${error.code})`,
+              success: true,
+              count: payloadList.length,
+              error: `Data tersimpan di penyimpanan lokal. Sinkronisasi cloud Supabase tertunda: ${error.message}`,
             };
           }
-        } catch (err) {
-          console.error('Supabase connection error during batch save:', err);
+        } catch (err: any) {
+          console.warn('Supabase network error during batch save, safely stored in local cache:', err);
           return {
-            success: false,
-            count: 0,
-            error: `Koneksi Supabase gagal: ${(err as Error).message}`,
+            success: true,
+            count: payloadList.length,
+            error: `Data tersimpan di penyimpanan lokal. Sinkronisasi cloud tertunda: ${err?.message || 'Koneksi terputus'}`,
           };
         }
       }
     }
 
-    // Local storage upsert (for offline persistence and fast UI responsiveness)
-    const allRecords: DailyManpower[] = JSON.parse(localStorage.getItem(KEY_MANPOWER) || '[]');
-    
-    for (const item of payloadList) {
-      const existingIdx = allRecords.findIndex(
-        (r) => r.project_id === projectId && r.job_role_id === item.job_role_id && r.work_date === workDate
-      );
-      if (existingIdx >= 0) {
-        allRecords[existingIdx] = {
-          ...allRecords[existingIdx],
-          worker_count: item.worker_count,
-          notes: item.notes,
-          updated_at: now,
-        };
-      } else {
-        allRecords.push(item);
-      }
-    }
-
-    localStorage.setItem(KEY_MANPOWER, JSON.stringify(allRecords));
     return { success: true, count: payloadList.length };
   }
 

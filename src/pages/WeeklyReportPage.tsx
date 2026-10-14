@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   FileSpreadsheet,
   FileText,
@@ -8,6 +8,9 @@ import {
   UserCheck,
   Printer,
   Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  Layers,
 } from 'lucide-react';
 import { Project, MatrixSummary } from '../types';
 import { WeeklyMatrixTable } from '../components/manpower/WeeklyMatrixTable';
@@ -21,6 +24,17 @@ interface WeeklyReportPageProps {
   onDateRangeChange: (start: string, end: string) => void;
   onExportExcel: (recorder?: string, inspector?: string) => void;
   onExportPDF: (recorder?: string, inspector?: string) => void;
+}
+
+function addDays(dateStr: string, days: number): string {
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  d.setDate(d.getDate() + days);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export const WeeklyReportPage: React.FC<WeeklyReportPageProps> = ({
@@ -39,11 +53,78 @@ export const WeeklyReportPage: React.FC<WeeklyReportPageProps> = ({
     project.inspector_name || 'Dedi Kurniawan, ST (Inspector MK)'
   );
 
+  // Generate automatic weekly cycles from project start date
+  const availableWeeks = useMemo(() => {
+    const startContract = project.start_date || '2026-08-28';
+    const today = new Date().toISOString().split('T')[0];
+    const items: { weekNumber: number; name: string; start: string; end: string; isCurrent: boolean }[] = [];
+
+    let currentStart = startContract;
+    let weekNumber = 1;
+
+    // Generate up to 5 weeks past today or minimum 8 weeks
+    while (weekNumber <= 150) {
+      const currentEnd = addDays(currentStart, 6);
+      const isCurrent = today >= currentStart && today <= currentEnd;
+
+      items.push({
+        weekNumber,
+        name: `Minggu Ke-${weekNumber} (${formatDateIndo(currentStart)} - ${formatDateIndo(currentEnd)})`,
+        start: currentStart,
+        end: currentEnd,
+        isCurrent,
+      });
+
+      if (currentStart > today && weekNumber >= 8) {
+        break;
+      }
+
+      currentStart = addDays(currentEnd, 1);
+      weekNumber++;
+    }
+
+    return items;
+  }, [project.start_date]);
+
+  // Find if current start & end match an auto week
+  const currentWeekIndex = availableWeeks.findIndex(
+    (w) => w.start === startDateStr && w.end === endDateStr
+  );
+
+  const handleSelectWeek = (weekNumberStr: string) => {
+    if (weekNumberStr === 'custom') return;
+    const weekNum = parseInt(weekNumberStr, 10);
+    const found = availableWeeks.find((w) => w.weekNumber === weekNum);
+    if (found) {
+      onDateRangeChange(found.start, found.end);
+    }
+  };
+
+  const handlePrevWeek = () => {
+    if (currentWeekIndex > 0) {
+      const prev = availableWeeks[currentWeekIndex - 1];
+      onDateRangeChange(prev.start, prev.end);
+    } else if (currentWeekIndex === -1 && availableWeeks.length > 0) {
+      const first = availableWeeks[0];
+      onDateRangeChange(first.start, first.end);
+    }
+  };
+
+  const handleNextWeek = () => {
+    if (currentWeekIndex >= 0 && currentWeekIndex < availableWeeks.length - 1) {
+      const next = availableWeeks[currentWeekIndex + 1];
+      onDateRangeChange(next.start, next.end);
+    } else if (currentWeekIndex === -1 && availableWeeks.length > 0) {
+      const last = availableWeeks[availableWeeks.length - 1];
+      onDateRangeChange(last.start, last.end);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Top Banner & Filter Controls */}
+      {/* Top Banner & Automatic Week Controls */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-[#142B4A]"></span>
@@ -57,24 +138,62 @@ export const WeeklyReportPage: React.FC<WeeklyReportPageProps> = ({
             </p>
           </div>
 
-          {/* Date range filter */}
-          <div className="grid grid-cols-1 xs:grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full md:w-auto">
-            <div className="flex items-center justify-between gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs min-h-[44px]">
-              <span className="text-slate-500">Mulai:</span>
+          {/* Automatic Weekly Switcher & Date Controls */}
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+            {/* Week navigation buttons */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+              <button
+                type="button"
+                onClick={handlePrevWeek}
+                disabled={currentWeekIndex === 0}
+                className="p-1.5 rounded-lg text-slate-700 hover:bg-white hover:text-slate-900 disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer transition-colors"
+                title="Minggu Sebelumnya"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <div className="px-2 flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-[#F28C28]" />
+                <select
+                  value={currentWeekIndex >= 0 ? availableWeeks[currentWeekIndex].weekNumber : 'custom'}
+                  onChange={(e) => handleSelectWeek(e.target.value)}
+                  className="bg-transparent font-bold text-xs text-slate-800 focus:outline-hidden cursor-pointer max-w-[200px] sm:max-w-xs truncate"
+                >
+                  {availableWeeks.map((w) => (
+                    <option key={w.weekNumber} value={w.weekNumber}>
+                      Minggu {w.weekNumber} ({formatDateIndo(w.start)} - {formatDateIndo(w.end)}) {w.isCurrent ? '★ Aktif' : ''}
+                    </option>
+                  ))}
+                  <option value="custom">-- Rentang Tanggal Kustom --</option>
+                </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleNextWeek}
+                disabled={currentWeekIndex === availableWeeks.length - 1}
+                className="p-1.5 rounded-lg text-slate-700 hover:bg-white hover:text-slate-900 disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer transition-colors"
+                title="Minggu Berikutnya"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Date range pickers */}
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+              <span className="text-slate-500 text-[11px]">Tgl:</span>
               <input
                 type="date"
                 value={startDateStr}
                 onChange={(e) => onDateRangeChange(e.target.value, endDateStr)}
-                className="bg-transparent font-semibold text-slate-800 focus:outline-hidden"
+                className="bg-transparent font-semibold text-slate-800 focus:outline-hidden text-xs"
               />
-            </div>
-            <div className="flex items-center justify-between gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs min-h-[44px]">
-              <span className="text-slate-500">Sampai:</span>
+              <span className="text-slate-400">-</span>
               <input
                 type="date"
                 value={endDateStr}
                 onChange={(e) => onDateRangeChange(startDateStr, e.target.value)}
-                className="bg-transparent font-semibold text-slate-800 focus:outline-hidden"
+                className="bg-transparent font-semibold text-slate-800 focus:outline-hidden text-xs"
               />
             </div>
           </div>
@@ -158,40 +277,6 @@ export const WeeklyReportPage: React.FC<WeeklyReportPageProps> = ({
         onExportExcel={() => onExportExcel(recorderName, inspectorName)}
         onExportPDF={() => onExportPDF(recorderName, inspectorName)}
       />
-
-      {/* Export Description & Specs */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
-        <h4 className="font-bold text-slate-900 text-sm mb-3">
-          Spesifikasi Format Berkas Ekspor SIM-TK204:
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-600">
-          <div className="p-3 rounded-lg bg-emerald-50/60 border border-emerald-200/80">
-            <div className="font-bold text-emerald-900 flex items-center gap-1.5 mb-1">
-              <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
-              <span>Format Excel (.xlsx) 4 Lembar Kerja:</span>
-            </div>
-            <ul className="list-disc pl-4 space-y-0.5 text-emerald-800 text-[11px]">
-              <li><strong>Lembar 1: Monitoring Mingguan</strong> — Matriks Keahlian × Tanggal + Total & Rata-rata.</li>
-              <li><strong>Lembar 2: Rekap Harian</strong> — Daftar tanggal, jumlah orang, dan catatan lapangan.</li>
-              <li><strong>Lembar 3: Rekap Per Jabatan</strong> — Total orang-hari dan persentase alokasi tiap keahlian.</li>
-              <li><strong>Lembar 4: Identitas Proyek</strong> — Spesifikasi teknis, kontraktor, MK, dan pengesahan.</li>
-            </ul>
-          </div>
-
-          <div className="p-3 rounded-lg bg-blue-50/60 border border-blue-200/80">
-            <div className="font-bold text-blue-900 flex items-center gap-1.5 mb-1">
-              <FileText className="w-4 h-4 text-blue-700" />
-              <span>Format PDF (A4 Landscape):</span>
-            </div>
-            <ul className="list-disc pl-4 space-y-0.5 text-blue-800 text-[11px]">
-              <li>Tata letak A4 Landscape proporsional untuk tabel periode banyak kolom.</li>
-              <li>Kop identitas proyek konstruksi resmi dengan warna Navy #142B4A & Orange #F28C28.</li>
-              <li>3 Kolom lembar pengesahan tanda tangan (Kontraktor, MK, dan Project Manager).</li>
-              <li>Dapat langsung diunduh (.pdf) maupun dicetak printer proyek.</li>
-            </ul>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

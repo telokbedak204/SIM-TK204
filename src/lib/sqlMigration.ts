@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS public.projects (
     location TEXT NOT NULL,
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
+    contract_date DATE,
+    spmk_date DATE,
     project_manager TEXT NOT NULL,
     site_manager TEXT NOT NULL,
     recorder_name TEXT,
