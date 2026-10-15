@@ -210,16 +210,17 @@ export class DataService {
       { id: 'usr-3', name: 'Ahmad Faisal', email: 'faisal.admin@simtk204.id', role: 'editor' as UserRole, company: 'PT. Teknik Eksakta', password: 'password123', is_active: true },
       { id: 'usr-4', name: 'Dedi Kurniawan, ST', email: 'dedi.mk@simtk204.id', role: 'viewer' as UserRole, company: 'PT. Arcansia Dwitama Konsultan', password: 'password123', is_active: true },
       { id: 'usr-5', name: 'Guntur, ST', email: 'tukangpipa672@gmail.com', role: 'editor' as UserRole, company: 'PT. Arcansia Dwitama Konsultan KSO PT. Teknik Eksakta', password: 'Loka123', is_active: true },
+      { id: 'usr-6', name: 'Viewer Data', email: 'base204data@gmail.com', role: 'viewer' as UserRole, company: 'Monitoring Stakeholder / Pengawas', password: 'qwe123', is_active: true },
     ];
     if (typeof window === 'undefined') return INITIAL_USERS;
     try {
       const raw = localStorage.getItem(KEY_SYSTEM_USERS);
       const storedUsers = raw ? JSON.parse(raw) : [];
       
-      // Merge / overwrite with INITIAL_USERS by id
+      // Merge / overwrite with INITIAL_USERS by id or email
       const merged = [...storedUsers];
       INITIAL_USERS.forEach(user => {
-        const idx = merged.findIndex(u => u.id === user.id);
+        const idx = merged.findIndex(u => u.id === user.id || u.email.toLowerCase() === user.email.toLowerCase());
         if (idx >= 0) {
           merged[idx] = { ...merged[idx], ...user };
         } else {

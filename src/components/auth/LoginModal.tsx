@@ -206,6 +206,34 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             </div>
           </div>
 
+          {/* Quick Account Selector */}
+          {systemUsers.length > 0 && (
+            <div className="pt-0.5">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                <span>Pilih Cepat Akun:</span>
+                <span className="text-[10px] text-[#F28C28] font-normal">Klik untuk isi otomatis</span>
+              </div>
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                {systemUsers.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => handleQuickSelectUser(u)}
+                    className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-all shrink-0 cursor-pointer ${
+                      identifier.toLowerCase() === u.email.toLowerCase()
+                        ? 'bg-[#142B4A] text-white border-[#142B4A] font-bold shadow-xs'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
+                    title={`${u.name} - ${u.email} (${u.role})`}
+                  >
+                    <span>{u.name.split(',')[0]}</span>
+                    <span className="text-[10px] opacity-75 ml-1">({u.role})</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={isLoading}

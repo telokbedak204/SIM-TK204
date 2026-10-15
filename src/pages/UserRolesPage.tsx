@@ -49,6 +49,7 @@ const INITIAL_SYSTEM_USERS: SystemUser[] = [
   { id: 'usr-3', name: 'Ahmad Faisal', email: 'faisal.admin@simtk204.id', role: 'editor', company: 'PT. Teknik Eksakta', password: 'password123', is_active: true },
   { id: 'usr-4', name: 'Dedi Kurniawan, ST', email: 'dedi.mk@simtk204.id', role: 'viewer', company: 'PT. Arcansia Dwitama Konsultan', password: 'password123', is_active: true },
   { id: 'usr-5', name: 'Guntur, ST', email: 'tukangpipa672@gmail.com', role: 'editor', company: 'PT. Arcansia Dwitama Konsultan KSO PT. Teknik Eksakta', password: 'Loka123', is_active: true },
+  { id: 'usr-6', name: 'Viewer Data', email: 'base204data@gmail.com', role: 'viewer', company: 'Monitoring Stakeholder / Pengawas', password: 'qwe123', is_active: true },
 ];
 
 export const UserRolesPage: React.FC<UserRolesPageProps> = ({
@@ -65,7 +66,17 @@ export const UserRolesPage: React.FC<UserRolesPageProps> = ({
     if (typeof window === 'undefined') return INITIAL_SYSTEM_USERS;
     try {
       const raw = localStorage.getItem(KEY_SYSTEM_USERS);
-      return raw ? JSON.parse(raw) : INITIAL_SYSTEM_USERS;
+      const stored: SystemUser[] = raw ? JSON.parse(raw) : [];
+      const merged = [...stored];
+      INITIAL_SYSTEM_USERS.forEach((u) => {
+        const idx = merged.findIndex((m) => m.id === u.id || m.email.toLowerCase() === u.email.toLowerCase());
+        if (idx >= 0) {
+          merged[idx] = { ...merged[idx], ...u };
+        } else {
+          merged.push(u);
+        }
+      });
+      return merged.length > 0 ? merged : INITIAL_SYSTEM_USERS;
     } catch {
       return INITIAL_SYSTEM_USERS;
     }
