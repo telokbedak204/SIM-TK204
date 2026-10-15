@@ -55,65 +55,65 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
     if (!showGuideModal) return null;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-xs p-4 animate-in fade-in">
-        <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-200 text-slate-800 overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto animate-in fade-in">
+        <div className="w-full max-w-md rounded-2xl sm:rounded-3xl bg-white shadow-2xl border border-slate-200 text-slate-800 overflow-hidden flex flex-col max-h-[90dvh] my-auto">
           {/* Header */}
-          <div className="bg-[#142B4A] text-white p-4 sm:p-5 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
+          <div className="bg-[#142B4A] text-white p-4 sm:p-5 flex items-center justify-between border-b border-[#1d3d66]">
+            <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#F28C28] to-orange-600 flex items-center justify-center text-white shadow shrink-0">
                 <Download className="w-5 h-5" />
               </div>
-              <div>
-                <h3 className="font-bold text-sm sm:text-base leading-tight">
+              <div className="min-w-0">
+                <h3 className="font-bold text-sm sm:text-base leading-tight truncate">
                   Cara Pasang Aplikasi SIM-TK204
                 </h3>
-                <p className="text-[11px] text-slate-300">
-                  Instalasi cepat ke layar utama tanpa Google Play / App Store
+                <p className="text-[10px] sm:text-[11px] text-slate-300 truncate">
+                  Instalasi cepat ke layar utama tanpa app store
                 </p>
               </div>
             </div>
             <button
               onClick={() => setShowGuideModal(false)}
-              className="p-1.5 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+              className="p-1.5 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer shrink-0 ml-1"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Device Tabs */}
-          <div className="flex border-b border-slate-200 bg-slate-50 p-1.5 gap-1 text-xs font-semibold">
+          <div className="flex border-b border-slate-200 bg-slate-50 p-1.5 gap-1 text-[11px] sm:text-xs font-semibold overflow-x-auto">
             <button
               onClick={() => setActiveGuideTab('android')}
-              className={`flex-1 py-2 px-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              className={`flex-1 min-w-[85px] py-2 px-2 rounded-lg flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
                 activeGuideTab === 'android'
                   ? 'bg-white text-[#142B4A] shadow-xs font-bold border border-slate-200'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Android / Chrome</span>
+              <Smartphone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span className="truncate">Android</span>
             </button>
             <button
               onClick={() => setActiveGuideTab('ios')}
-              className={`flex-1 py-2 px-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              className={`flex-1 min-w-[85px] py-2 px-2 rounded-lg flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
                 activeGuideTab === 'ios'
                   ? 'bg-white text-[#142B4A] shadow-xs font-bold border border-slate-200'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Smartphone className="w-3.5 h-3.5 text-blue-600" />
-              <span>iPhone / iPad</span>
+              <Smartphone className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <span className="truncate">iPhone / iOS</span>
             </button>
             <button
               onClick={() => setActiveGuideTab('desktop')}
-              className={`flex-1 py-2 px-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              className={`flex-1 min-w-[85px] py-2 px-2 rounded-lg flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
                 activeGuideTab === 'desktop'
                   ? 'bg-white text-[#142B4A] shadow-xs font-bold border border-slate-200'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Monitor className="w-3.5 h-3.5 text-purple-600" />
-              <span>Laptop / PC</span>
+              <Monitor className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+              <span className="truncate">PC / Laptop</span>
             </button>
           </div>
 
@@ -269,10 +269,11 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
           onClick={handleInstallClick}
           disabled={isInstalling}
           title="Pasang aplikasi SIM-TK204 ke layar utama HP / Laptop"
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#F28C28] to-orange-500 hover:from-orange-600 hover:to-orange-600 active:scale-95 text-white text-xs font-bold shadow-md transition-all cursor-pointer ${className}`}
+          className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#F28C28] to-orange-500 hover:from-orange-600 hover:to-orange-600 active:scale-95 text-white text-[11px] sm:text-xs font-bold shadow-md transition-all cursor-pointer shrink-0 ${className}`}
         >
-          <Download className="w-3.5 h-3.5 animate-pulse" />
-          <span>Instal App</span>
+          <Download className="w-3.5 h-3.5 animate-pulse shrink-0" />
+          <span className="hidden sm:inline">Instal App</span>
+          <span className="sm:hidden">Instal</span>
         </button>
         {renderGuideModal()}
       </>
@@ -283,17 +284,17 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
   if (variant === 'login') {
     if (isInstalled) {
       return (
-        <div className={`p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between gap-3 ${className}`}>
-          <div className="flex items-center gap-2.5">
+        <div className={`p-3 sm:p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between gap-3 ${className}`}>
+          <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
               <CheckCircle2 className="w-4 h-4" />
             </div>
-            <div>
-              <div className="font-bold text-slate-800">Aplikasi SIM-TK204 Terpasang</div>
-              <p className="text-[11px] text-emerald-700">Berjalan dalam mode PWA Standalone di perangkat Anda.</p>
+            <div className="min-w-0">
+              <div className="font-bold text-slate-800 text-xs sm:text-sm truncate">Aplikasi SIM-TK204 Terpasang</div>
+              <p className="text-[10px] sm:text-[11px] text-emerald-700 truncate">Berjalan dalam mode PWA Standalone di perangkat Anda.</p>
             </div>
           </div>
-          <span className="text-[10px] bg-emerald-200/60 text-emerald-800 font-bold px-2 py-0.5 rounded-md uppercase">
+          <span className="text-[10px] bg-emerald-200/60 text-emerald-800 font-bold px-2 py-0.5 rounded-md uppercase shrink-0">
             PWA Aktif
           </span>
         </div>
@@ -302,43 +303,43 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
 
     return (
       <>
-        <div className={`p-3.5 sm:p-4 rounded-xl bg-gradient-to-br from-slate-50 to-orange-50/40 border border-orange-200/80 shadow-xs space-y-3 ${className}`}>
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-[#F28C28] text-white flex items-center justify-center shadow-xs shrink-0">
-                <Download className="w-5 h-5 animate-bounce" />
-              </div>
-              <div>
-                <h4 className="font-bold text-xs sm:text-sm text-[#142B4A] flex items-center gap-1.5">
-                  <span>Pasang Aplikasi SIM-TK204</span>
-                  <span className="text-[9px] font-extrabold uppercase bg-orange-100 text-orange-700 px-1.5 py-0.2 rounded border border-orange-200">
-                    PWA
-                  </span>
+        <div className={`p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-gradient-to-br from-slate-50 to-orange-50/40 border border-orange-200/80 shadow-xs space-y-3 ${className}`}>
+          <div className="flex items-start gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#F28C28] text-white flex items-center justify-center shadow-xs shrink-0">
+              <Download className="w-5 h-5 animate-bounce" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h4 className="font-bold text-xs sm:text-sm text-[#142B4A]">
+                  Pasang Aplikasi SIM-TK204
                 </h4>
-                <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
-                  Akses langsung 1-klik dari layar utama HP atau Laptop tanpa ketik URL web.
-                </p>
+                <span className="text-[9px] font-extrabold uppercase bg-orange-100 text-orange-700 px-1.5 py-0.2 rounded border border-orange-200">
+                  PWA
+                </span>
               </div>
+              <p className="text-[11px] sm:text-xs text-slate-500 leading-snug mt-0.5">
+                Akses langsung 1-klik dari layar utama HP atau Laptop tanpa ketik URL web.
+              </p>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
             <button
               type="button"
               onClick={handleInstallClick}
               disabled={isInstalling}
-              className="w-full flex-1 flex items-center justify-center gap-2 py-2.5 px-3.5 rounded-xl bg-gradient-to-r from-[#F28C28] to-orange-600 hover:from-orange-600 hover:to-orange-700 active:scale-[0.99] text-white text-xs font-bold shadow transition-all cursor-pointer min-h-[40px]"
+              className="w-full sm:flex-1 flex items-center justify-center gap-2 py-2.5 px-3.5 rounded-xl bg-gradient-to-r from-[#F28C28] to-orange-600 hover:from-orange-600 hover:to-orange-700 active:scale-[0.99] text-white text-xs sm:text-sm font-bold shadow transition-all cursor-pointer min-h-[42px]"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-4 h-4 shrink-0" />
               <span>{isInstalling ? 'Membuka Pemasangan...' : 'Instal ke Layar Utama'}</span>
             </button>
 
             <button
               type="button"
               onClick={() => setShowGuideModal(true)}
-              className="w-full sm:w-auto px-3 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1.5 min-h-[40px] whitespace-nowrap"
+              className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs sm:text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1.5 min-h-[42px] whitespace-nowrap"
             >
-              <Info className="w-3.5 h-3.5 text-blue-600" />
+              <Info className="w-3.5 h-3.5 text-blue-600 shrink-0" />
               <span>Petunjuk Cara Pasang</span>
             </button>
           </div>

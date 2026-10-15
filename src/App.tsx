@@ -321,7 +321,7 @@ export default function App() {
 
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-3 sm:p-4">
+      <div className="min-h-[100dvh] w-full max-w-full bg-gradient-to-br from-[#0c1829] via-[#142B4A] to-slate-900 flex flex-col justify-center items-center p-2.5 sm:p-6 overflow-x-hidden overflow-y-auto">
         <LoginModal
           isOpen={true}
           isFullPage={true}
@@ -539,7 +539,7 @@ export default function App() {
       {/* Modal Masuk / Ganti Akun */}
       <LoginModal
         isOpen={isLoginModalOpen}
-        isFullPage={true}
+        isFullPage={false}
         onClose={() => setIsLoginModalOpen(false)}
         onLoginSuccess={handleLoginSuccess}
         addToast={addToast}
