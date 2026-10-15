@@ -2,6 +2,47 @@
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
+    <!-- Filter benign Vite HMR WebSocket proxy noise in preview -->
+    <script>
+      (function() {
+        var isViteWs = function(str) {
+          if (!str) return false;
+          var s = String(str);
+          return s.indexOf('WebSocket') !== -1 || s.indexOf('[@vite/client]') !== -1 || s.indexOf('[vite]') !== -1;
+        };
+        var origConsoleError = console.error;
+        console.error = function() {
+          for (var i = 0; i < arguments.length; i++) {
+            var arg = arguments[i];
+            if (arg && (isViteWs(arg) || (arg.message && isViteWs(arg.message)))) {
+              return;
+            }
+          }
+          origConsoleError.apply(console, arguments);
+        };
+        window.addEventListener('error', function(e) {
+          if (e && (isViteWs(e.message) || (e.error && isViteWs(e.error.message)))) {
+            e.stopImmediatePropagation();
+            if (e.preventDefault) e.preventDefault();
+            return true;
+          }
+        }, true);
+        window.addEventListener('unhandledrejection', function(e) {
+          var reason = e && (e.reason || e);
+          var msg = (typeof reason === 'string' ? reason : (reason && reason.message)) || '';
+          if (isViteWs(msg)) {
+            e.stopImmediatePropagation();
+            if (e.preventDefault) e.preventDefault();
+            return true;
+          }
+        }, true);
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+          if (isViteWs(msg) || (error && isViteWs(error.message))) {
+            return true;
+          }
+        };
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>SIM-TK204 — Sistem Informasi Monitoring Tenaga Kerja Proyek Konstruksi</title>
     <meta name="description" content="Aplikasi monitoring dan rekapitulasi harian/mingguan tenaga kerja proyek konstruksi dengan ekspor Excel, PDF, dan integrasi database Supabase." />

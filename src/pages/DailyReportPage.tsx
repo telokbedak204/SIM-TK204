@@ -297,6 +297,9 @@ export const DailyReportPage: React.FC<DailyReportPageProps> = ({
   const [reportToDelete, setReportToDelete] = useState<string | null>(null);
   const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
 
+  // State untuk pratinjau foto penuh dan unduh foto
+  const [previewPhotoModal, setPreviewPhotoModal] = useState<DriveDocumentationPhoto | null>(null);
+
   const isSuperAdmin = currentUser ? isSuperAdminUser(currentUser.email, currentUser.id, currentUser.role) : false;
 
   useEffect(() => {
@@ -498,6 +501,73 @@ export const DailyReportPage: React.FC<DailyReportPageProps> = ({
       addToast('error', 'Gagal mengunggah ke Google Drive: ' + err.message);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleDownloadPhoto = async (photo: DriveDocumentationPhoto) => {
+    try {
+      const sanitizedName = photo.file_name || `foto-dokumentasi-${photo.work_date || selectedDate}.jpg`;
+
+      // 1. Jika ada data_url (Base64 atau Blob URL)
+      if (photo.data_url) {
+        if (photo.data_url.startsWith('data:')) {
+          const link = document.createElement('a');
+          link.href = photo.data_url;
+          link.download = sanitizedName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          addToast('success', `Foto "${sanitizedName}" berhasil diunduh ke perangkat Anda.`, 'Unduh Selesai');
+          return;
+        }
+
+        // Jika berbentuk URL (http/https)
+        try {
+          const res = await fetch(photo.data_url);
+          const blob = await res.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = sanitizedName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+          addToast('success', `Foto "${sanitizedName}" berhasil diunduh.`, 'Unduh Selesai');
+          return;
+        } catch {
+          // Fallback buka tautan jika fetch diblokir CORS
+          const link = document.createElement('a');
+          link.href = photo.data_url;
+          link.download = sanitizedName;
+          link.target = '_blank';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          addToast('info', 'Membuka foto untuk diunduh...', 'Unduh Foto');
+          return;
+        }
+      }
+
+      // 2. Jika tersimpan di Google Drive nyata
+      if (photo.google_drive_file_id && !photo.google_drive_file_id.startsWith('simulated-')) {
+        const directDownloadUrl = `https://drive.google.com/uc?export=download&id=${photo.google_drive_file_id}`;
+        window.open(directDownloadUrl, '_blank');
+        addToast('info', `Mengunduh berkas "${sanitizedName}" langsung dari Google Drive...`, 'Unduh Drive');
+        return;
+      }
+
+      // 3. Jika hanya ada web_view_link Google Drive
+      if (photo.web_view_link) {
+        window.open(photo.web_view_link, '_blank');
+        addToast('info', 'Membuka berkas foto di Google Drive untuk diunduh.', 'Google Drive');
+        return;
+      }
+
+      addToast('error', 'Data berkas foto tidak ditemukan untuk diunduh.');
+    } catch (err: any) {
+      console.error('Error downloading photo:', err);
+      addToast('error', 'Gagal mengunduh foto: ' + (err?.message || 'Terjadi kesalahan sistem'));
     }
   };
 
@@ -1452,45 +1522,90 @@ ${consultantName}`;
                   {photos.map((p) => {
                     const isRealOnDrive = Boolean(p.google_drive_file_id && !p.google_drive_file_id.startsWith('simulated-'));
                     return (
-                      <div key={p.id} className="relative group bg-slate-100 rounded-xl overflow-hidden border border-slate-200 shadow-xs flex flex-col">
-                        <div className="h-28 bg-slate-200 overflow-hidden relative">
+                      <div key={p.id} className="relative group bg-slate-100 rounded-xl overflow-hidden border border-slate-200 shadow-xs flex flex-col hover:border-slate-300 transition-all">
+                        {/* Area Thumbnail Foto (Bisa diklik untuk perbesar) */}
+                        <div
+                          className="h-28 bg-slate-200 overflow-hidden relative cursor-pointer group/thumb"
+                          onClick={() => setPreviewPhotoModal(p)}
+                          title="Klik untuk memperbesar foto & opsi unduh"
+                        >
                           {p.data_url ? (
-                            <img src={p.data_url} alt={p.file_name} className="w-full h-full object-cover" />
+                            <img src={p.data_url} alt={p.file_name} className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">Foto</div>
                           )}
-                          <div className="absolute top-1 right-1 flex items-center gap-1 opacity-90 group-hover:opacity-100 transition-opacity">
+
+                          {/* Overlay Bar Aksi Foto (Unduh, Buka Drive, Hapus) */}
+                          <div className="absolute top-1.5 right-1.5 flex items-center gap-1 opacity-90 group-hover:opacity-100 transition-opacity z-10">
+                            {/* Tombol Unduh / Download Foto */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownloadPhoto(p);
+                              }}
+                              className="p-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-90 text-white rounded-md shadow-md transition-all cursor-pointer flex items-center justify-center"
+                              title="Unduh / Simpan Foto ke Perangkat"
+                              aria-label="Unduh Foto"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Tombol Buka di Google Drive */}
                             {p.web_view_link && (
                               <a
                                 href={p.web_view_link}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-1 bg-blue-600 text-white rounded-md shadow-xs hover:bg-blue-700"
+                                className="p-1.5 bg-blue-600 hover:bg-blue-700 active:scale-90 text-white rounded-md shadow-md transition-all flex items-center justify-center"
                                 title="Buka di Google Drive"
+                                onClick={(e) => e.stopPropagation()}
                               >
                                 <ExternalLink className="w-3.5 h-3.5" />
                               </a>
                             )}
+
+                            {/* Tombol Hapus Foto */}
                             <button
                               type="button"
-                              onClick={() => handleDeletePhoto(p.id)}
-                              className="p-1 bg-rose-600 text-white rounded-md shadow-xs hover:bg-rose-700 cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeletePhoto(p.id);
+                              }}
+                              className="p-1.5 bg-rose-600 hover:bg-rose-700 active:scale-90 text-white rounded-md shadow-md transition-all cursor-pointer flex items-center justify-center"
                               title="Hapus Foto"
+                              aria-label="Hapus Foto"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </div>
+
+                        {/* Keterangan & Footer Aksi Unduh / Drive */}
                         <div className="p-2 bg-white flex-1 flex flex-col justify-between">
-                          <p className="text-[11px] font-semibold text-slate-800 line-clamp-2">{p.caption}</p>
-                          <div className="flex items-center justify-between mt-1 text-[9px]">
-                            <span className="truncate text-slate-400 max-w-[85px]">{p.file_name}</span>
+                          <p className="text-[11px] font-semibold text-slate-800 line-clamp-2" title={p.caption}>{p.caption}</p>
+                          <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-100 text-[9px] gap-1">
+                            <div className="flex items-center gap-1 min-w-0">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDownloadPhoto(p);
+                                }}
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold border border-emerald-200 transition-colors cursor-pointer text-[9px] shrink-0"
+                                title="Unduh foto ini"
+                              >
+                                <Download className="w-2.5 h-2.5 text-emerald-600" />
+                                <span>Unduh</span>
+                              </button>
+                              <span className="truncate text-slate-400 max-w-[70px] sm:max-w-[85px]" title={p.file_name}>{p.file_name}</span>
+                            </div>
                             {isRealOnDrive ? (
                               <a
                                 href={p.web_view_link || `https://drive.google.com/file/d/${p.google_drive_file_id}/view`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-emerald-700 font-bold flex items-center gap-0.5 hover:underline"
+                                className="text-emerald-700 font-bold flex items-center gap-0.5 hover:underline shrink-0 text-[9px]"
                                 title="Buka berkas ini di Google Drive"
                               >
                                 <span>Drive ☁️</span>
@@ -1501,11 +1616,11 @@ ${consultantName}`;
                                 type="button"
                                 onClick={() => handleUploadExistingPhotoToDrive(p)}
                                 disabled={uploading}
-                                className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-bold flex items-center gap-1 cursor-pointer transition-colors shrink-0 text-[9px]"
                                 title="Unggah berkas foto ini ke Google Drive Anda sekarang"
                               >
                                 <CloudUpload className="w-2.5 h-2.5 text-blue-600" />
-                                <span>Unggah ke Drive</span>
+                                <span>Drive</span>
                               </button>
                             )}
                           </div>
@@ -2007,6 +2122,101 @@ ${consultantName}`;
                 Ya, Hapus Foto
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Pratinjau Foto Penuh & Unduh (Lightbox Dialog) */}
+      {previewPhotoModal && (
+        <div
+          className="fixed inset-0 z-70 bg-black/85 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-fade-in"
+          onClick={() => setPreviewPhotoModal(null)}
+        >
+          <div
+            className="bg-slate-900 rounded-2xl max-w-3xl w-full max-h-[92vh] overflow-hidden flex flex-col shadow-2xl border border-slate-700 animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header modal pratinjau */}
+            <div className="flex items-center justify-between p-3 sm:p-4 bg-slate-950/90 border-b border-slate-800 text-white">
+              <div className="min-w-0 pr-2">
+                <h4 className="text-sm font-bold truncate text-slate-100">
+                  {previewPhotoModal.caption || 'Dokumentasi Lapangan Proyek'}
+                </h4>
+                <p className="text-[11px] text-slate-400 truncate">
+                  {previewPhotoModal.file_name} • {formatDateIndo(previewPhotoModal.work_date || selectedDate)}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Tombol Unduh Utama */}
+                <button
+                  type="button"
+                  onClick={() => handleDownloadPhoto(previewPhotoModal)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
+                  title="Unduh / Simpan foto ini ke perangkat Anda"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Unduh Foto</span>
+                </button>
+
+                {previewPhotoModal.web_view_link && (
+                  <a
+                    href={previewPhotoModal.web_view_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xs transition-colors"
+                    title="Buka di Google Drive"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setPreviewPhotoModal(null)}
+                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition-colors cursor-pointer"
+                  title="Tutup Pratinjau"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Foto Area Resolusi Penuh */}
+            <div className="flex-1 bg-black/95 p-2 sm:p-4 flex items-center justify-center overflow-auto min-h-[220px]">
+              {previewPhotoModal.data_url ? (
+                <img
+                  src={previewPhotoModal.data_url}
+                  alt={previewPhotoModal.file_name}
+                  className="max-h-[65vh] w-auto max-w-full object-contain rounded-lg shadow-2xl"
+                />
+              ) : previewPhotoModal.thumbnail_link ? (
+                <img
+                  src={previewPhotoModal.thumbnail_link}
+                  alt={previewPhotoModal.file_name}
+                  className="max-h-[65vh] w-auto max-w-full object-contain rounded-lg shadow-2xl"
+                />
+              ) : (
+                <div className="text-slate-400 text-xs py-10">Gambar tidak tersedia untuk pratinjau langsung.</div>
+              )}
+            </div>
+
+            {/* Keterangan Footer */}
+            {previewPhotoModal.caption && (
+              <div className="p-3 bg-slate-950/90 border-t border-slate-800 text-xs text-slate-300 flex items-center justify-between gap-3">
+                <p className="truncate">
+                  <span className="text-slate-400 font-medium">Keterangan:</span> {previewPhotoModal.caption}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadPhoto(previewPhotoModal)}
+                  className="text-emerald-400 hover:text-emerald-300 text-xs font-semibold inline-flex items-center gap-1 hover:underline shrink-0 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Simpan ke HP/Laptop</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
